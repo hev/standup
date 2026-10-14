@@ -7,16 +7,18 @@ export function range(from, to) {
   return {from,to};
 }
 export function candidate(note) {
-  const turns = note.transcript;
+  const turns = note.transcript ?? [];
+  if (note.updated_at != null && (typeof note.updated_at!=='string' || !/(Z|[+-]\d{2}:\d{2})$/.test(note.updated_at) || !Number.isFinite(Date.parse(note.updated_at)))) throw Error('Invalid authoritative source revision');
+  const fullEvidenceHash = hash(note);
   const time = turns.find(t => Number.isFinite(Date.parse(t.start_time)))?.start_time ?? note.calendar_event?.scheduled_start_time ?? null;
   const timeBasis = turns.some(t => Number.isFinite(Date.parse(t.start_time))) ? 'transcript' : time ? 'scheduled' : 'unknown';
   const transcript = turns.map((t,index) => ({index, text:t.text, speaker:t.speaker ?? null, start:t.start_time ?? null, end:t.end_time ?? null}));
-  const source = {id:note.id, revision:hash(note), type:'granola', url:note.web_url ?? '', time:time ?? '', summary:note.summary_markdown ?? note.summary_text ?? '', transcript:JSON.stringify(transcript)};
-  return {id:note.id, revision:source.revision, title:note.title ?? null, source, sourceUpdatedAt:note.updated_at, createdAt:note.created_at, calendar:note.calendar_event ?? null, timeBasis, transcript, status:'needs_review', reasons:[turns.length ? 'Transcript evidence requires explicit review' : 'No transcript evidence'], hints:{title: /stand.?up|check.?in|sync/i.test(note.title ?? ''), content:/yesterday|blocker|progress|next|today/i.test(source.summary + source.transcript)}, evidenceHash:hash({source,timeBasis})};
+  const source = {id:note.id, revision:note.updated_at ?? fullEvidenceHash, type:'granola', url:note.web_url ?? '', time:time ?? '', summary:note.summary_markdown ?? note.summary_text ?? '', transcript:JSON.stringify(transcript)};
+  return {id:note.id, revision:source.revision, title:note.title ?? null, source, sourceUpdatedAt:note.updated_at, transcriptComplete:Array.isArray(note.transcript) && note.transcript_complete!==false, fullEvidenceHash, revisionBasis:note.updated_at ? 'api_updated_at' : 'canonical_evidence_hash', createdAt:note.created_at, calendar:note.calendar_event ?? null, timeBasis, transcript, status:'needs_review', reasons:[turns.length ? 'Transcript evidence requires explicit review' : 'No transcript evidence'], hints:{title: /stand.?up|check.?in|sync/i.test(note.title ?? ''), content:/yesterday|blocker|progress|next|today/i.test(source.summary + source.transcript)}, evidenceHash:hash({source,timeBasis})};
 }
-export async function discover(api, {from,to,client, checkpoint = null, save = async () => {}}) {
+export async function discover(api, {from,to,client, checkpoint = null, inputIdentity, save = async () => {}}) {
   range(from,to); if (!client?.trim()) throw Error('Client context required');
-  const scope = {from,to,client};
+  const scope = {from,to,client,...(inputIdentity?{inputIdentity}:{})};
   if (checkpoint && JSON.stringify(checkpoint.scope) !== JSON.stringify(scope)) throw Error('Checkpoint scope mismatch');
   const state = checkpoint ?? {format:'granola-candidates-v1',scope,candidates:[],excluded:[],failures:[],cursor:null,complete:false,scanned:0};
   if (state.complete) return state;
@@ -55,7 +57,9 @@ export function reviewTemplate(scan) {
   return {format:'granola-review-v1',reviews:scan.candidates.map(c=>({id:c.id,evidenceHash:c.evidenceHash,decision:'ambiguous',reason:'',client:scan.scope.client,projects:[],evidence:[],contextReason:'',relatedSources:[]}))};
 }
 export function reviewedNote(c, r, scope) {
+  if (c.sourceUpdatedAt && c.source.revision!==c.sourceUpdatedAt) throw Error('Legacy hash revision: rebuild candidates and review from raw cache');
   if (r.evidenceHash !== c.evidenceHash || c.evidenceHash !== hash({source:c.source,timeBasis:c.timeBasis}) || c.revision !== c.source.revision) throw Error('Stale review');
+  if (r.importedSourceRevision !== undefined && (r.importedSourceRevision !== c.sourceUpdatedAt || r.importedSourceRevision !== c.source.revision)) throw Error('Imported revision override must equal authoritative sourceUpdatedAt');
   if (JSON.stringify(c.transcript) !== c.source.transcript) throw Error('Transcript evidence mismatch');
   if (r.client !== scope.client || !r.contextReason?.trim() || !r.reason?.trim()) throw Error('Explicit client evidence and reason required');
   if (!Array.isArray(r.projects) || !r.projects.length || r.projects.some(p=>typeof p!=='string'||!p.trim())) throw Error('Projects required');
@@ -82,7 +86,7 @@ export function reviewedNote(c, r, scope) {
     if (typeof r.summaryExcerpt!=='string' || !r.summaryExcerpt.trim() || !c.source.summary.includes(r.summaryExcerpt) || !r.excerptReason?.trim()) throw Error('Summary excerpt must be exact source text with reason');
     summary = r.summaryExcerpt;
   }
-  const provenance = {evidenceRetention:{transcript:r.transcriptTurns ? 'reviewed_excerpt' : 'complete', summary:r.summaryExcerpt !== undefined ? 'reviewed_excerpt' : 'complete', originalTranscriptTurns:c.transcript.length, sourceEvidenceHash:c.evidenceHash, excerptReason:r.excerptReason ?? null, originals:'Retained in private local candidate file'},reviewReason:r.reason,contextReason:r.contextReason,evidence:r.evidence,sourceUpdatedAt:c.sourceUpdatedAt,timeBasis:c.timeBasis,timeReason:r.timeReason ?? null,relatedSources:r.relatedSources ?? []};
+  const provenance = {evidenceRetention:{transcript:r.transcriptTurns ? 'reviewed_excerpt' : c.transcriptComplete===false ? 'cached_excerpt_or_missing' : 'complete', summary:r.summaryExcerpt !== undefined ? 'reviewed_excerpt' : 'complete', originalTranscriptTurns:c.transcript.length, sourceEvidenceHash:c.evidenceHash, fullEvidenceHash:c.fullEvidenceHash, revisionBasis:c.revisionBasis, excerptReason:r.excerptReason ?? null, originals:c.transcriptComplete===false ? 'Full transcript remains at original Granola URL; cache contains partial evidence only' : 'Retained in private local candidate file and original Granola URL'},reviewReason:r.reason,contextReason:r.contextReason,evidence:r.evidence,sourceUpdatedAt:c.sourceUpdatedAt,timeBasis:c.timeBasis,timeReason:r.timeReason ?? null,relatedSources:r.relatedSources ?? []};
   const note = {title:c.title || 'Untitled standup',client:r.client,projects:r.projects,date:time.slice(0,10),type:'standup',progress:'',next:'',blockerIds:[],notes:'Imported meeting evidence; proposals and speaker attribution remain unverified.\n'+JSON.stringify(provenance),source:{...c.source,time,summary,transcript}};
   for (const value of [note.notes,note.source.summary,note.source.transcript]) if (value.length>12000) throw Error('App field limit exceeded; retain local original and explicitly select reviewed transcriptTurns/summaryExcerpt');
   return note;
@@ -113,4 +117,15 @@ export async function importReviewed(scan, review, {request, dryRun = true, save
     await save(report);
   }
   return report;
+}
+
+// A local cache is an explicit snapshot, never a claim of fresh Personal API coverage.
+export function cachedAPI(cache) {
+  if (cache.format!=='granola-cache-v1' || !Array.isArray(cache.notes) || !cache.coverage?.complete || !cache.coverage.description?.trim()) throw Error('Cache requires notes and explicit complete snapshot coverage description');
+  const notes = new Map();
+  for (const n of cache.notes) {
+    if (!n || typeof n.id!=='string' || !/^[\w-]+$/.test(n.id) || notes.has(n.id) || (n.transcript != null && (!Array.isArray(n.transcript) || n.transcript.some(t=>typeof t.text!=='string')))) throw Error('Invalid or duplicate cached note');
+    notes.set(n.id,n);
+  }
+  return {identity:hash(cache),async *pages() {yield {notes:[...notes.values()].map(n=>({id:n.id,deleted_at:n.deleted_at})),hasMore:false,cursor:null};},async note(id) {return structuredClone(notes.get(id));}};
 }

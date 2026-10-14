@@ -19,7 +19,8 @@ test('Granola CLI interoperates with exact app handler: private auth, stable imp
  let s=scan();assert.equal((await importReviewed(s,review(s),{request,dryRun:false})).imported,1);
  const original=[...rows.values()][0];assert.equal(Buffer.byteLength(original.id),63);assert.equal(original.source.time,'2026-10-14T09:00:00Z');assert.equal(original.progress,'');assert.equal(original.next,'');original.notes='Owner edit';
  assert.equal((await importReviewed(s,review(s),{request,dryRun:false})).alreadyPresent,1);assert.equal(original.notes,'Owner edit');
- n.summary_text='Source revised';s=scan();assert.equal((await importReviewed(s,review(s),{request,dryRun:false})).imported,1);assert.equal(rows.size,2);
+ n.summary_text='Same authoritative revision, different excerpt formatting';s=scan();assert.equal((await importReviewed(s,review(s),{request,dryRun:false})).alreadyPresent,1);assert.equal(rows.size,1);
+ n.summary_text='Source revised';n.updated_at='2026-10-14T11:00:00Z';s=scan();assert.equal((await importReviewed(s,review(s),{request,dryRun:false})).imported,1);assert.equal(rows.size,2);
  n.id='not_synthetic00002';s=scan();await importReviewed(s,review(s),{request,dryRun:false});assert.equal(rows.size,3);assert(namespaces.every(ns=>ns==='fictional-private'));
  const unauthorized=appRequest({url:'https://app.test',token:'wrong',fetchImpl});await assert.rejects(importReviewed(s,review(s),{request:unauthorized,dryRun:false}),/HTTP_401/);assert.equal(rows.size,3);
  env.APP_MODE='demo';await assert.rejects(importReviewed(s,review(s),{request,dryRun:false}),/private/);assert.equal(rows.size,3);

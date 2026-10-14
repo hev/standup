@@ -68,7 +68,7 @@ test('private-only destination checked before content write; 401 sends no body',
 test('repeat imports preserve edits, new source revisions and same-day IDs remain distinct',async()=>{
  const stored=new Map();const request=async(path,opts)=>{if(path==='/api/config')return {mode:'private',readOnly:false};const n=opts.data;const key=JSON.stringify([n.source.id,n.source.revision,n.client,[...n.projects].sort()]);if(stored.has(key))return {entry:stored.get(key),duplicate:true};const entry={...n,id:'entry'+stored.size};stored.set(key,entry);return {entry};};
  const s=scanFor();const r=accept(s);assert.equal((await importReviewed(s,r,{request,dryRun:false})).imported,1);[...stored.values()][0].progress='Owner edit';assert.equal((await importReviewed(s,r,{request,dryRun:false})).alreadyPresent,1);assert.equal([...stored.values()][0].progress,'Owner edit');
- const changed=scanFor(candidate({...note(),summary_text:'Updated source summary'}));await importReviewed(changed,accept(changed),{request,dryRun:false});
+ const changed=scanFor(candidate({...note(),summary_text:'Updated source summary',updated_at:'2026-10-14T19:00:00Z'}));await importReviewed(changed,accept(changed),{request,dryRun:false});
  const other=scanFor(candidate(note('not_synthetic00003')));await importReviewed(other,accept(other),{request,dryRun:false});assert.equal(stored.size,3);
 });
 test('stale review, invented quotes, summary-only signals, missing context and oversized evidence rejected before writes',async()=>{
@@ -104,4 +104,26 @@ test('large mixed meeting supports explicitly reviewed excerpts with full local 
 test('explicit identity gateway mode authenticates config before payload and never forges identity',async()=>{
  const calls=[];const request=appRequest({url:'https://private.example',auth:'identity',token:null,fetchImpl:async(url,init)=>{calls.push({path:new URL(url).pathname,...init});return new URL(url).pathname==='/api/config'?json({mode:'private',readOnly:false}):json({entry:{id:'identity-entry'}});}});
  const s=scanFor();assert.equal((await importReviewed(s,accept(s),{dryRun:false,request})).imported,1);assert.equal(calls[0].path,'/api/config');assert.equal(calls[0].body,undefined);assert.equal(calls[0].headers.Authorization,undefined);assert.equal(calls[1].headers['Tailscale-User-Login'],undefined);
+});
+test('authoritative updated_at matches preexisting import identity while evidence hash remains separate',async()=>{
+ const s=scanFor();const c=s.candidates[0];assert.equal(c.source.revision,'2026-10-14T18:00:00Z');assert.match(c.fullEvidenceHash,/^[a-f0-9]{64}$/);
+ const reordered=candidate(Object.fromEntries(Object.entries(note()).reverse()));assert.equal(reordered.fullEvidenceHash,c.fullEvidenceHash);
+ const fmt=candidate({...note(),summary_text:'Summary format changed'});assert.equal(fmt.source.revision,c.source.revision);assert.notEqual(fmt.fullEvidenceHash,c.fullEvidenceHash);
+ const r=accept(s);r.reviews[0].importedSourceRevision=c.sourceUpdatedAt;
+ let calls=0;const request=async(p,o)=>p==='/api/config'?{mode:'private',readOnly:false}:(assert.equal(o.data.source.revision,note().updated_at),calls++,{entry:{id:'existing'},duplicate:true});
+ assert.equal((await importReviewed(s,r,{request,dryRun:false})).alreadyPresent,1);assert.equal(calls,1);
+ r.reviews[0].importedSourceRevision='different';await assert.rejects(importReviewed(s,r,{}),/authoritative/);
+ const noTime=note();delete noTime.updated_at;assert.equal(candidate(noTime).source.revision,candidate(noTime).fullEvidenceHash);
+});
+test('cached summaries and transcripts discover without network or credentials, preserving exact summary',async()=>{
+ const {cachedAPI}=await import('../src/granola/discovery.js');
+ const n=note();n.summary_markdown='\n  ## Exact summary  \n\n';
+ const cache={format:'granola-cache-v1',coverage:{complete:true,description:'Fictional reviewed local snapshot'},notes:[n,{...note('summary-only'),transcript:null,calendar_event:{scheduled_start_time:turns[0].start_time}}]};
+ const api=cachedAPI(cache);const s=await discover(api,{...scope,inputIdentity:api.identity});assert(s.complete);assert.equal(s.candidates.length,2);assert.equal(s.candidates[0].source.summary,n.summary_markdown);assert.equal(s.candidates[1].transcriptComplete,false);assert.equal(s.candidates[1].transcript.length,0);
+ await assert.rejects(discover(cachedAPI(cache),{...scope,inputIdentity:'changed',checkpoint:s}),/scope mismatch/);
+ assert.throws(()=>cachedAPI({...cache,notes:[n,n]}),/duplicate/);assert.throws(()=>cachedAPI({...cache,coverage:{complete:false}}),/coverage/);
+});
+
+test('legacy hash-revision candidates cannot duplicate timestamp-revision imports',async()=>{
+ const s=scanFor();s.candidates[0].source.revision='legacy-hash';s.candidates[0].revision='legacy-hash';await assert.rejects(importReviewed(s,accept(s),{}),/Legacy hash revision/);
 });

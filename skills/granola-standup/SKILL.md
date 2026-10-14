@@ -46,3 +46,9 @@ Report only counts/date range, exact code version, destination identity and safe
 status to shared tracking. Meeting bodies, evidence quotes and private identifiers
 stay in the private local artifacts. Report imported versus already-present,
 ambiguous, excluded and failed separately.
+
+Use `discover --cache` for an existing local inventory, without refetching. See
+the cache schema in the CLI contract. Preserve API `updated_at` exactly as the
+source revision so existing imports deduplicate; evidence hashes remain separate.
+Mark partial cached transcripts explicitly and never claim a cached excerpt is
+a complete original. Original Granola retains the full transcript.
