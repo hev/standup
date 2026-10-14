@@ -29,8 +29,8 @@ export function filters(params, kind='note') {
   if (params.get('to')) f.push(['date','Lte',date(params.get('to'))]);
   return ['And',f];
 }
-export function row(document) {
- const content=document.kind==='blocker' ? `${document.title} ${document.history.map(h=>h.evidence??'').join(' ')}` : [document.title,document.client,...document.projects,document.progress,document.next,document.notes,document.source?.summary,document.source?.transcript].filter(Boolean).join('\n');
+export function row(document, blockerEvidence=[]) {
+ const content=document.kind==='blocker' ? `${document.title} ${document.history.map(h=>h.evidence??'').join(' ')}` : [document.title,document.client,...document.projects,document.progress,document.next,document.notes,document.source?.summary,document.source?.transcript,...blockerEvidence].filter(Boolean).join('\n');
  return {id:document.id,revision:document.revision,kind:document.kind,client:document.client??'',projects:document.projects??[],date:document.date??document.since,type:document.type??'blocker',content,payload:JSON.stringify(document)};
 }
 export function decode(r) { const attrs=r.attributes??r; return JSON.parse(attrs.payload); }

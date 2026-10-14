@@ -5,6 +5,7 @@ const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{stat
 async function equal(a,b){if(!a||!b)return false;const hash=async v=>new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)));const [x,y]=await Promise.all([hash(a),hash(b)]);let diff=0;for(let i=0;i<x.length;i++)diff|=x[i]^y[i];return diff===0;}
 async function body(req){if(Number(req.headers.get('content-length'))>100000)throw new AppError(413,'Request is too large');const raw=await req.text();if(raw.length>100000)throw new AppError(413,'Request is too large');try{return JSON.parse(raw);}catch{throw new AppError(400,'Invalid JSON');}}
 async function granola(env,path){if(!env.GRANOLA_ADAPTER_URL || !env.GRANOLA_API_KEY)throw new AppError(503,'Granola is not configured. Paste notes manually.');try{const r=await fetch(env.GRANOLA_ADAPTER_URL.replace(/\/$/,'')+path,{headers:{Authorization:`Bearer ${env.GRANOLA_API_KEY}`},signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error();return await r.json();}catch{throw new AppError(502,'Call notes are unavailable. You can paste notes manually.');}}
+async function blockerEvidence(store,ids){const result=[];for(const id of ids){const b=await store.get(id);if(b?.kind!=='blocker')throw new AppError(400,'Unknown blocker');result.push(b.title+'\n'+(b.history[0]?.evidence??''));}return result;}
 export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
  const url=new URL(req.url),p=url.pathname,m=req.method;
  try{
@@ -39,14 +40,14 @@ export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
   if(p==='/api/facets'&&m==='GET'){const rows=await store.all(filters(new URLSearchParams()));return json({clients:[...new Set(rows.map(n=>n.client))].sort(),projects:[...new Set(rows.flatMap(n=>n.projects))].sort()});}
   if(p==='/api/export'&&m==='GET')return json({format:'standup-v1',entries:await store.all(filters(url.searchParams)),blockers:await store.all(['kind','Eq','blocker'])});
   if(p==='/api/entries'&&m==='POST'){
-   const b=await body(req),n=note(b);for(const id of n.blockerIds)if((await store.get(id))?.kind!=='blocker')throw new AppError(400,'Unknown blocker');
+   const b=await body(req),n=note(b);const evidence=await blockerEvidence(store,n.blockerIds);
    const id=b.importKey?await stableId(['archive',required(b.importKey,'import key',1000),n.client,[...n.projects].sort()]):crypto.randomUUID();
    if(b.importKey){const old=await store.get(id);if(old)return json({entry:old,duplicate:true});}
    const now=new Date().toISOString();const entry={...n,id,kind:'note',revision:1,createdAt:now,updatedAt:now};
-   try{await store.put(entry,null);}catch(e){if(b.importKey&&e.status===409)return json({entry:await store.get(id),duplicate:true});throw e;}return json({entry},201);
+   try{await store.put(entry,null,evidence);}catch(e){if(b.importKey&&e.status===409)return json({entry:await store.get(id),duplicate:true});throw e;}return json({entry},201);
   }
   const entryMatch=p.match(/^\/api\/entries\/([\w-]+)$/);
-  if(entryMatch){const old=await store.get(entryMatch[1]);if(!old||old.kind!=='note')throw new AppError(404,'Standup not found');if(m==='GET')return json({entry:old});if(m==='PUT'){const b=await body(req);if(!Number.isInteger(b.revision)||b.revision!==old.revision)throw new AppError(409,'This record changed. Load the latest version before saving.');const n=note(b);for(const id of n.blockerIds)if((await store.get(id))?.kind!=='blocker')throw new AppError(400,'Unknown blocker');const entry={...old,...n,revision:old.revision+1,updatedAt:new Date().toISOString()};await store.put(entry,b.revision);return json({entry});}}
+  if(entryMatch){const old=await store.get(entryMatch[1]);if(!old||old.kind!=='note')throw new AppError(404,'Standup not found');if(m==='GET')return json({entry:old});if(m==='PUT'){const b=await body(req);if(!Number.isInteger(b.revision)||b.revision!==old.revision)throw new AppError(409,'This record changed. Load the latest version before saving.');const n=note(b);const evidence=await blockerEvidence(store,n.blockerIds);const entry={...old,...n,revision:old.revision+1,updatedAt:new Date().toISOString()};await store.put(entry,b.revision,evidence);return json({entry});}}
   if(p==='/api/blockers'&&m==='GET')return json({rows:await store.all(['kind','Eq','blocker'])});
   if(p==='/api/blockers'&&m==='POST'){const b=await body(req),now=new Date().toISOString();const blocker={id:crypto.randomUUID(),kind:'blocker',title:required(b.title,'blocker title',500),client:required(b.client,'client'),since:date(b.since),status:'open',revision:1,history:[{at:now,status:'open',evidence:text(b.evidence??'','evidence',2000)}]};await store.put(blocker,null);return json({blocker},201);}
   const blockerMatch=p.match(/^\/api\/blockers\/([\w-]+)$/);
@@ -57,8 +58,8 @@ export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
   if(p==='/api/import/preview'&&m==='POST'){const b=await body(req);const s=source(b.source);if(!s)throw new AppError(400,'Choose a source');return json({source:s,draft:{title:'Call notes',progress:'',next:'',notes:s.summary||s.transcript},warning:'Editable draft. Speaker attribution may be ambiguous; proposals are not decisions or personal commitments.'});}
   if(p==='/api/import'&&m==='POST'){
    const b=await body(req),n=note(b);if(!n.source)throw new AppError(400,'Source is required');
-   const id=await stableId([n.source.type,n.source.id,n.source.revision,n.client,[...n.projects].sort()]);const old=await store.get(id);if(old)return json({entry:old,duplicate:true});
-   const now=new Date().toISOString(),entry={...n,id,kind:'note',revision:1,createdAt:now,updatedAt:now};try{await store.put(entry,null);}catch(e){if(e.status===409)return json({entry:await store.get(id),duplicate:true});throw e;}return json({entry},201);
+   const id=await stableId([n.source.type,n.source.id,n.source.revision,n.client,[...n.projects].sort()]);const old=await store.get(id);if(old)return json({entry:old,duplicate:true});const evidence=await blockerEvidence(store,n.blockerIds);
+   const now=new Date().toISOString(),entry={...n,id,kind:'note',revision:1,createdAt:now,updatedAt:now};try{await store.put(entry,null,evidence);}catch(e){if(e.status===409)return json({entry:await store.get(id),duplicate:true});throw e;}return json({entry},201);
   }
   throw new AppError(404,'Route not found');
  }catch(e){if(!(e instanceof AppError))console.error('Unhandled app error',e.name);return json({error:e instanceof AppError?e.message:'Service unavailable. Please try again.'},e.status??503);}
