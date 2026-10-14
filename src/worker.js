@@ -13,6 +13,7 @@ export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
   if(!['demo','private','sandbox'].includes(env.APP_MODE))throw new AppError(503,'App mode is not configured');
   const namespaces=validateNamespaces({demo:env.DEMO_NAMESPACE,privateNotes:env.PRIVATE_NAMESPACE,sandbox:env.SANDBOX_NAMESPACE});
   const isDemo=env.APP_MODE==='demo';
+  if(!isDemo&&(!/^[A-Za-z0-9_.~+=-]{32,200}$/.test(env.OWNER_TOKEN??'')||env.OWNER_TOKEN.startsWith('replace-')))throw new AppError(503,'Private authentication is not configured. Set a random owner token of at least 32 characters.');
   const bearer=req.headers.get('Authorization')?.replace(/^Bearer /,'');
   const cookie=req.headers.get('Cookie')?.split(';').map(s=>s.trim()).find(s=>s.startsWith('standup_session='))?.slice(16);
   const supplied=bearer??cookie;
