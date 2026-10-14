@@ -26,3 +26,5 @@ capture is permitted only in an explicitly expiring isolated sandbox. A validato
 also checks clean-clone self-host setup, not just an already prepared developer
 checkout. Deployment credentials and validation host paths remain outside this
 repository. Product candidate acceptance is separate from bootstrap CI.
+
+Owner-focus acceptance extends the existing exact-candidate Mini preview: configure a fictional profile; review a mixed multi-speaker meeting; save actions and relevant dependencies with exact source quotes; label speaker ambiguity and a proposed date; verify unrelated round-robin updates remain in the full meeting. Refresh, inspect original CRLF/whitespace and unchanged note revision, then read the long original at 390px. `scripts/uat preview` records these checks using synthetic content. The real Layer suite separately checks overlay persistence and conflicts. Deployment owners must also confirm unchanged private note/source IDs, count, auth and search without publishing real bodies. Mascot selection and actual-size visual inspection are recorded with the asset provenance.
