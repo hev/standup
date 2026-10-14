@@ -53,8 +53,7 @@ date. No timezone is invented when the source gives only UTC.
 
 Set `relatedSources` to explicitly reviewed archive/source references for likely
 Markdown duplicates; they are retained in provenance, never silently collapsed.
-Distinct source IDs on the same date remain distinct. Source revisions are
-content hashes of full API evidence; a changed revision creates a separate entry
+Distinct source IDs on the same date remain distinct. Source revisions use authoritative API `updated_at` with a canonical hash fallback; a changed revision creates a separate entry
 under the existing app policy, preserving the old one. An identical retry returns
 the original entry, preserving user edits. The report separates scanned,
 candidates, qualifying, imported, alreadyPresent, ambiguous, excluded and failures.
@@ -125,3 +124,60 @@ checkout (no server credentials):
 `STANDUP_APP_CHECKOUT=/path/to/standup-app node --test test/granola-app-contract.mjs`.
 It uses the actual app handler and a synthetic store to test the unchanged API;
 it does not claim a live Granola account or real backend storage validation.
+
+## Reuse a local cache without refetching
+
+`discover --cache CACHE.json --from ISO --to ISO --client CLIENT --out LOCAL.json`
+uses no Granola credentials or network. Adapt existing local per-note results to:
+
+```json
+{
+  "format":"granola-cache-v1",
+  "coverage":{"complete":true,"description":"All notes in the selected local inventory; not a fresh API scan"},
+  "notes":[{
+    "id":"not_synthetic00001","title":null,
+    "updated_at":"2026-10-14T18:00:00Z",
+    "web_url":"https://notes.granola.ai/d/fictional",
+    "summary_markdown":"Full original summary, whitespace preserved",
+    "calendar_event":{"scheduled_start_time":"2026-10-14T09:00:00Z"},
+    "transcript":[{"text":"Fictional team update","start_time":"2026-10-14T09:00:00Z","speaker":{"attribution":"me"}}]
+  }]
+}
+```
+
+Keep every inventory note, even null/misleading titles and summary-only records.
+Map API fields exactly, without trimming original summaries. Join cached transcript
+results by source ID. Missing transcripts use `null`; partial cached transcripts
+must set `transcript_complete:false`. Neither is claimed to be a full original.
+The coverage description names the local snapshot's bounds; `complete:true` means
+the supplied snapshot inventory is complete, not that Granola was freshly scanned.
+Changing the cache invalidates resumability; generate a fresh scan and review.
+Existing accepted/excluded/held judgments can be transcribed into review JSON, but
+accepted judgments still need indexed transcript quotes, context reasons and
+explicit excerpt indexes/reason. Do not upload cache bodies to shared logs.
+
+Source revision is now the exact authoritative API `updated_at` string, matching
+existing API imports. It is never reformatted or replaced by an excerpt hash.
+When `updated_at` is absent, a canonical evidence SHA256 is the fallback. Separate
+`fullEvidenceHash` hashes all available raw note evidence (including a full cached
+transcript when supplied), while `evidenceHash` binds the normalized review input.
+These are evidence hashes, not claims of source completeness. `revisionBasis` and
+excerpt provenance describe the distinction. Optional review
+`importedSourceRevision` must equal both `sourceUpdatedAt` and source revision;
+arbitrary overrides fail. Rescanning unchanged cached notes with the same context
+therefore returns already-present entries created using `updated_at`, including
+imports whose transcript excerpt formatting differs. A new authoritative revision
+preserves the old entry. Old hash-revision candidate/review files must be rebuilt
+from their original raw cache; do not silently reinterpret old review hashes.
+
+For standalone transfer, archive the exact commit without app deployment files:
+
+```sh
+git archive --format=tar.gz --output=granola-cli.tar.gz EXACT_SHA package.json LICENSE bin/granola-standup.js src/granola skills/granola-standup scripts/install-granola-skill.mjs docs/granola.md
+mkdir granola-cli
+tar -xzf granola-cli.tar.gz -C granola-cli
+node granola-cli/bin/granola-standup.js help
+```
+
+No dependency installation is needed. The CLI is backward compatible with the
+existing private `/api/config` and `/api/import`; it requires no server rollout.

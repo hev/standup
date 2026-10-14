@@ -3,9 +3,9 @@ import {readFile,open,rename,chmod} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {PersonalAPI} from '../src/granola/personal-api.js';
-import {discover,reviewTemplate,importReviewed} from '../src/granola/discovery.js';
+import {discover,reviewTemplate,importReviewed,cachedAPI} from '../src/granola/discovery.js';
 export const help = `Granola standup discovery (Node 22+, laptop or private server only)
-  discover --from ISO_WITH_ZONE --to EXCLUSIVE_ISO_WITH_ZONE --client CLIENT --out PRIVATE.json [--resume]
+  discover --from ISO_WITH_ZONE --to EXCLUSIVE_ISO_WITH_ZONE --client CLIENT --out PRIVATE.json [--resume] [--cache CACHE.json]
   review-template --candidates PRIVATE.json --out REVIEW.json
   import --candidates PRIVATE.json --review REVIEW.json --out REPORT.json [--apply]
 Environment: GRANOLA_API_KEY for discovery; STANDUP_URL plus STANDUP_TOKEN (or STANDUP_AUTH=identity) for apply.
@@ -37,7 +37,7 @@ export async function main(args) {
   const [command,...rest]=args;
   if (!command || ['help','--help','-h'].includes(command)) { console.log(help); return; }
   const opts={};
-  const allowed=new Set(['from','to','client','out','resume','candidates','review','apply']);
+  const allowed=new Set(['from','to','client','out','resume','candidates','review','apply','cache']);
   for(let i=0;i<rest.length;i++) {
     const key=rest[i].slice(2);
     if (!rest[i].startsWith('--') || !allowed.has(key) || Object.hasOwn(opts,key)) throw Error('Invalid option');
@@ -50,7 +50,10 @@ export async function main(args) {
   let result;
   if(command==='discover') {
     const checkpoint=opts.resume?await read(opts.out):null;
-    result=await discover(new PersonalAPI(),{...opts,checkpoint,save:s=>privateWrite(opts.out,s)});
+    const cache=opts.cache?await read(opts.cache):null;
+    const api=cache?cachedAPI(cache):new PersonalAPI();
+    result=await discover(api,{...opts,inputIdentity:cache?api.identity:undefined,checkpoint,save:s=>privateWrite(opts.out,s)});
+    if(cache) {result.coverage={kind:'local_cache',...cache.coverage};await privateWrite(opts.out,result);}
     console.log(JSON.stringify({complete:result.complete,scanned:result.scanned,candidates:result.candidates.length,excluded:result.excluded.length,failures:result.failures.length}));
     if(!result.complete || result.failures.length) process.exitCode=2;
     return;
