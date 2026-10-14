@@ -1,0 +1,18 @@
+# Owner-focused reading
+
+Configure your name, aliases and relevant projects in **Your focus**. A meeting opens with your progress, explicit actions, dependencies and decisions affecting you. A separate editable view can be prepared by a trusted local workflow or edited in the app. No automatic provider calls occur. Without reviewed evidence, Standup says that the view needs review and offers the complete meeting.
+
+Every claim retains an exact quote and its source field. Ambiguous attribution stays labeled; proposals must not become decisions, and another speaker's update must not become your commitment. Relevant team dependencies belong here; unrelated round-robin updates remain in the full meeting. Changing profile, note or source makes the prior view stale until reviewed again. Originals and import identity never change when a derived view is saved.
+
+## Version 1 data contract
+
+All endpoints inherit the instance authentication, CSRF and demo read-only rules. No private content belongs in public fixtures, logs or evidence.
+
+- `GET /api/profile` returns `{profile}` (null if unconfigured).
+- `PUT /api/profile` accepts `{revision: 0, name: "Morgan", aliases: ["Morgan", "M"], projects: ["Checkout"]}` for creation; updates use the returned revision. Returns `{profile}` including `version:1` and incremented `revision`.
+- `GET /api/entries/:id/personalization` returns `{personalization}` (null if absent).
+- `PUT /api/entries/:id/personalization` accepts `{revision:0, personalization:{version:1, profileRevision:1, entryRevision:1, sourceRevision:"source revision or empty string", claims:[{kind:"action", text:"Review the checkout proposal", certainty:"explicit", evidence:[{field:"source.summary", quote:"Morgan will review the checkout proposal."}]}], ambiguity:["The meeting proposes a launch date; no decision was recorded."]}}`. Updates use the overlay's returned revision, not the entry revision. Allowed kinds: `progress`, `action`, `dependency`, `decision`. Certainty: `explicit` or `ambiguous`. Evidence fields: `source.summary`, `source.transcript`, `progress`, `next`, `notes`. Quotes must be nonempty exact substrings of the existing field. Source IDs, authoritative revisions, original whitespace and entry counts remain unchanged. No new import.
+
+The overlay is a separate Layer document (`kind:personalization`) keyed by existing entry ID; profile is `kind:profile`. Neither is a note or search result. Optimistic revisions prevent overwrites. Full originals are still available through the existing entry/export endpoints. Export includes overlays and profile separately for portability. The app never silently extracts commitments from aliases or speaker labels. The trusted reviewer is responsible for semantic attribution; exact-quote validation establishes traceability, not truth.
+
+Refresh sequence: read profile and existing entries; inspect original evidence locally; prepare claims with explicit ambiguity; PUT only the separate personalization endpoint. On conflict, re-read and review. Verify the same note/source IDs and original bodies afterward. Do not reimport, rewrite sources or send private content to an unapproved provider.
