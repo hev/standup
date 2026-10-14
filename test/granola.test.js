@@ -35,8 +35,8 @@ test('Personal API fetches every note and transcript page, nullable/misleading t
 test('mixed meeting accepted explicitly; proposals stay evidence; negative and ambiguous distinguished',async()=>{
  const s=scanFor();s.candidates.push(candidate({...note('negative','Daily standup'),transcript:[{text:'Welcome to the product sales presentation.',start_time:turns[0].start_time}]}));s.scanned++;
  const r=accept(s);Object.assign(r.reviews[1],{decision:'excluded',reason:'Sales presentation without team updates'});
- let sent;const report=await importReviewed(s,r,{dryRun:false,request:async(path,opts)=>path==='/api/config'?{mode:'private',readOnly:false}:(sent=opts.data,{entry:{id:'x'}})});
- assert.equal(report.qualifying,1);assert.equal(report.imported,1);assert.equal(report.excluded,1);assert.equal(sent.progress,'');assert.equal(sent.next,'');assert(sent.source.transcript.includes('perhaps replace'));assert(sent.notes.includes('likely_duplicate'));
+ let sent;const report=await importReviewed(s,r,{dryRun:false,request:async(path,opts)=>path==='/api/config'?{mode:'private',readOnly:false,features:{structuredProvenance:true}}:(sent=opts.data,{entry:{id:'x'}})});
+ assert.equal(report.qualifying,1);assert.equal(report.imported,1);assert.equal(report.excluded,1);assert.equal(sent.progress,'');assert.equal(sent.next,'');assert(sent.source.transcript.includes('perhaps replace'));assert(JSON.stringify(sent.provenance).includes('likely_duplicate'));
  r.reviews[1].decision='ambiguous';assert.equal((await importReviewed(s,r,{})).ambiguous,1);
 });
 test('failed fetch is incomplete, sanitized, checkpoint resumes failed page without duplication',async()=>{
@@ -66,7 +66,7 @@ test('private-only destination checked before content write; 401 sends no body',
  assert.throws(()=>appRequest({url:'http://remote.example',token:'x'}),/HTTPS/);
 });
 test('repeat imports preserve edits, new source revisions and same-day IDs remain distinct',async()=>{
- const stored=new Map();const request=async(path,opts)=>{if(path==='/api/config')return {mode:'private',readOnly:false};const n=opts.data;const key=JSON.stringify([n.source.id,n.source.revision,n.client,[...n.projects].sort()]);if(stored.has(key))return {entry:stored.get(key),duplicate:true};const entry={...n,id:'entry'+stored.size};stored.set(key,entry);return {entry};};
+ const stored=new Map();const request=async(path,opts)=>{if(path==='/api/config')return {mode:'private',readOnly:false,features:{structuredProvenance:true}};const n=opts.data;const key=JSON.stringify([n.source.id,n.source.revision,n.client,[...n.projects].sort()]);if(stored.has(key))return {entry:stored.get(key),duplicate:true};const entry={...n,id:'entry'+stored.size};stored.set(key,entry);return {entry};};
  const s=scanFor();const r=accept(s);assert.equal((await importReviewed(s,r,{request,dryRun:false})).imported,1);[...stored.values()][0].progress='Owner edit';assert.equal((await importReviewed(s,r,{request,dryRun:false})).alreadyPresent,1);assert.equal([...stored.values()][0].progress,'Owner edit');
  const changed=scanFor(candidate({...note(),summary_text:'Updated source summary',updated_at:'2026-10-14T19:00:00Z'}));await importReviewed(changed,accept(changed),{request,dryRun:false});
  const other=scanFor(candidate(note('not_synthetic00003')));await importReviewed(other,accept(other),{request,dryRun:false});assert.equal(stored.size,3);
@@ -97,12 +97,12 @@ test('large mixed meeting supports explicitly reviewed excerpts with full local 
  const n=note();n.transcript.push({text:'Unrelated deep architecture discussion. '.repeat(1000),start_time:'2026-10-14T09:10:00-04:00'});
  const s=scanFor(candidate(n)),r=accept(s);const original=s.candidates[0].source.transcript;
  Object.assign(r.reviews[0],{transcriptTurns:[0,1],excerptReason:'Retain standup portion; full discussion retained locally'});
- let sent;assert.equal((await importReviewed(s,r,{dryRun:false,request:async(p,o)=>p==='/api/config'?{mode:'private',readOnly:false}:(sent=o.data,{entry:{id:'fake'}})})).imported,1);
- assert.equal(JSON.parse(sent.source.transcript).length,2);assert(sent.notes.includes('reviewed_excerpt'));assert.equal(s.candidates[0].source.transcript,original);
+ let sent;assert.equal((await importReviewed(s,r,{dryRun:false,request:async(p,o)=>p==='/api/config'?{mode:'private',readOnly:false,features:{structuredProvenance:true}}:(sent=o.data,{entry:{id:'fake'}})})).imported,1);
+ assert.equal(JSON.parse(sent.source.transcript).length,2);assert(JSON.stringify(sent.provenance).includes('reviewed_excerpt'));assert.equal(s.candidates[0].source.transcript,original);
  r.reviews[0].transcriptTurns=[0];await assert.rejects(importReviewed(s,r,{}),/every cited/);
 });
 test('explicit identity gateway mode authenticates config before payload and never forges identity',async()=>{
- const calls=[];const request=appRequest({url:'https://private.example',auth:'identity',token:null,fetchImpl:async(url,init)=>{calls.push({path:new URL(url).pathname,...init});return new URL(url).pathname==='/api/config'?json({mode:'private',readOnly:false}):json({entry:{id:'identity-entry'}});}});
+ const calls=[];const request=appRequest({url:'https://private.example',auth:'identity',token:null,fetchImpl:async(url,init)=>{calls.push({path:new URL(url).pathname,...init});return new URL(url).pathname==='/api/config'?json({mode:'private',readOnly:false,features:{structuredProvenance:true}}):json({entry:{id:'identity-entry'}});}});
  const s=scanFor();assert.equal((await importReviewed(s,accept(s),{dryRun:false,request})).imported,1);assert.equal(calls[0].path,'/api/config');assert.equal(calls[0].body,undefined);assert.equal(calls[0].headers.Authorization,undefined);assert.equal(calls[1].headers['Tailscale-User-Login'],undefined);
 });
 test('authoritative updated_at matches preexisting import identity while evidence hash remains separate',async()=>{
@@ -110,7 +110,7 @@ test('authoritative updated_at matches preexisting import identity while evidenc
  const reordered=candidate(Object.fromEntries(Object.entries(note()).reverse()));assert.equal(reordered.fullEvidenceHash,c.fullEvidenceHash);
  const fmt=candidate({...note(),summary_text:'Summary format changed'});assert.equal(fmt.source.revision,c.source.revision);assert.notEqual(fmt.fullEvidenceHash,c.fullEvidenceHash);
  const r=accept(s);r.reviews[0].importedSourceRevision=c.sourceUpdatedAt;
- let calls=0;const request=async(p,o)=>p==='/api/config'?{mode:'private',readOnly:false}:(assert.equal(o.data.source.revision,note().updated_at),calls++,{entry:{id:'existing'},duplicate:true});
+ let calls=0;const request=async(p,o)=>p==='/api/config'?{mode:'private',readOnly:false,features:{structuredProvenance:true}}:(assert.equal(o.data.source.revision,note().updated_at),calls++,{entry:{id:'existing'},duplicate:true});
  assert.equal((await importReviewed(s,r,{request,dryRun:false})).alreadyPresent,1);assert.equal(calls,1);
  r.reviews[0].importedSourceRevision='different';await assert.rejects(importReviewed(s,r,{}),/authoritative/);
  const noTime=note();delete noTime.updated_at;assert.equal(candidate(noTime).source.revision,candidate(noTime).fullEvidenceHash);

@@ -39,3 +39,9 @@ The application owns the deploy config and version endpoint. Deployers use their
 existing Cloudflare access, build the exact reviewed commit, keep the previous
 version for rollback and verify that the live version matches. Never deploy a
 scaffold as evidence of a working product.
+
+The search text is a derived Layer field: note text plus immutable title/initial
+evidence of explicitly linked blockers. Canonical payloads retain blocker IDs,
+so users carry a blocker without recopying prose. The tested native profile is
+1024-dimensional Qwen4B; higher dimensions remain a documented compatibility
+limitation. No alternate vectors or automatic schema-warming fallback is used.
