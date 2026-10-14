@@ -9,3 +9,15 @@ test('public demo rejects writes and cross-origin cookie mutation',async()=>{con
 test('declared preview search outage is explicit and still requires private access',async()=>{const disabled={...env,SEARCH_DISABLED:'1'};const r=await handle(new Request('https://app.test/api/search?q=HBR-142',{headers:{Authorization:'Bearer '+env.OWNER_TOKEN}}),disabled,()=>{throw Error('disabled search must not call backend');});assert.equal(r.status,503);assert.match((await r.json()).error,/Search is unavailable/);const denied=await handle(new Request('https://app.test/api/search?q=HBR-142'),disabled);assert.equal(denied.status,401);});
 
 test('private example placeholders cannot grant access',async()=>{const r=await handle(new Request('https://app.test/api/export',{headers:{Authorization:'Bearer replace-with-a-random-owner-token'}}),{...env,OWNER_TOKEN:'replace-with-a-random-owner-token'},()=>{throw Error('unsafe configuration must not reach backend');});assert.equal(r.status,503);});
+
+test('source evidence preserves whitespace while retaining bounded string validation',()=>{
+ const evidence=' \tOriginal fictional evidence\r\n\n';
+ const source={id:'fictional',revision:'1',type:'archive',summary:evidence,transcript:evidence};
+ const parsed=note({...input,title:'  Harbor  ',source});
+ assert.equal(parsed.title,'Harbor');
+ assert.equal(parsed.source.summary,evidence);assert.equal(parsed.source.transcript,evidence);
+ for(const field of ['summary','transcript']){
+  assert.throws(()=>note({...input,source:{...source,[field]:'x'.repeat(12001)}}),/Invalid/);
+  assert.throws(()=>note({...input,source:{...source,[field]:123}}),/Invalid/);
+ }
+});
