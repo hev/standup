@@ -16,3 +16,7 @@ All endpoints inherit the instance authentication, CSRF and demo read-only rules
 The overlay is a separate Layer document (`kind:personalization`) keyed by existing entry ID; profile is `kind:profile`. Neither is a note or search result. Optimistic revisions prevent overwrites. Full originals are still available through the existing entry/export endpoints. Export includes overlays and profile separately for portability. The app never silently extracts commitments from aliases or speaker labels. The trusted reviewer is responsible for semantic attribution; exact-quote validation establishes traceability, not truth.
 
 Refresh sequence: read profile and existing entries; inspect original evidence locally; prepare claims with explicit ambiguity; PUT only the separate personalization endpoint. On conflict, re-read and review. Verify the same note/source IDs and original bodies afterward. Do not reimport, rewrite sources or send private content to an unapproved provider.
+
+## Visual treatment
+
+Standup follows the published [hev mind brand](https://hevmind.com/brand): paper and warm paper surfaces, ink and muted reading text, a single burnt orange signal, 1px rules and corners at most 2px. JetBrains Mono carries headings, navigation and controls; Inter carries prose. The operator mascot is a separate raster signature with pixel rendering, never generated typography or a substitute logo.
