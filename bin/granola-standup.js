@@ -8,7 +8,7 @@ export const help = `Granola standup discovery (Node 22+, laptop or private serv
   discover --from ISO_WITH_ZONE --to EXCLUSIVE_ISO_WITH_ZONE --client CLIENT --out PRIVATE.json [--resume] [--cache CACHE.json]
   review-template --candidates PRIVATE.json --out REVIEW.json
   import --candidates PRIVATE.json --review REVIEW.json --out REPORT.json [--apply]
-Environment: GRANOLA_API_KEY for discovery; STANDUP_URL plus STANDUP_TOKEN (or STANDUP_AUTH=identity) for apply.
+Environment: GRANOLA_API_KEY for live discovery (--cache needs none); STANDUP_URL plus STANDUP_TOKEN (or STANDUP_AUTH=identity) for apply.
 All meeting pages and transcript pages are read, including null/misleading titles.
 Candidates are unverified. Review every transcript for content and client evidence.
 Import defaults to dry run; --apply requires an authenticated writable private app.

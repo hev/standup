@@ -123,3 +123,7 @@ test('cached summaries and transcripts discover without network or credentials, 
  await assert.rejects(discover(cachedAPI(cache),{...scope,inputIdentity:'changed',checkpoint:s}),/scope mismatch/);
  assert.throws(()=>cachedAPI({...cache,notes:[n,n]}),/duplicate/);assert.throws(()=>cachedAPI({...cache,coverage:{complete:false}}),/coverage/);
 });
+
+test('legacy hash-revision candidates cannot duplicate timestamp-revision imports',async()=>{
+ const s=scanFor();s.candidates[0].source.revision='legacy-hash';s.candidates[0].revision='legacy-hash';await assert.rejects(importReviewed(s,accept(s),{}),/Legacy hash revision/);
+});

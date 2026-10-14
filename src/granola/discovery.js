@@ -57,6 +57,7 @@ export function reviewTemplate(scan) {
   return {format:'granola-review-v1',reviews:scan.candidates.map(c=>({id:c.id,evidenceHash:c.evidenceHash,decision:'ambiguous',reason:'',client:scan.scope.client,projects:[],evidence:[],contextReason:'',relatedSources:[]}))};
 }
 export function reviewedNote(c, r, scope) {
+  if (c.sourceUpdatedAt && c.source.revision!==c.sourceUpdatedAt) throw Error('Legacy hash revision: rebuild candidates and review from raw cache');
   if (r.evidenceHash !== c.evidenceHash || c.evidenceHash !== hash({source:c.source,timeBasis:c.timeBasis}) || c.revision !== c.source.revision) throw Error('Stale review');
   if (r.importedSourceRevision !== undefined && (r.importedSourceRevision !== c.sourceUpdatedAt || r.importedSourceRevision !== c.source.revision)) throw Error('Imported revision override must equal authoritative sourceUpdatedAt');
   if (JSON.stringify(c.transcript) !== c.source.transcript) throw Error('Transcript evidence mismatch');
