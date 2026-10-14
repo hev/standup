@@ -8,7 +8,7 @@ const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{stat
 async function equal(a,b){if(!a||!b)return false;const hash=async v=>new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)));const [x,y]=await Promise.all([hash(a),hash(b)]);let diff=0;for(let i=0;i<x.length;i++)diff|=x[i]^y[i];return diff===0;}
 async function body(req){if(Number(req.headers.get('content-length'))>100000)throw new AppError(413,'Request is too large');const raw=await req.text();if(raw.length>100000)throw new AppError(413,'Request is too large');try{return JSON.parse(raw);}catch{throw new AppError(400,'Invalid JSON');}}
 async function granola(env,path){if(!env.GRANOLA_API_KEY)throw new AppError(503,'Granola is not configured. Paste notes manually.');try{if(!env.GRANOLA_ADAPTER_URL){const id=path.match(/^\/calls\/([\w-]+)$/)?.[1];return await personalCalls(new PersonalAPI({token:env.GRANOLA_API_KEY}),id??null);}const r=await fetch(env.GRANOLA_ADAPTER_URL.replace(/\/$/,'')+path,{headers:{Authorization:`Bearer ${env.GRANOLA_API_KEY}`},signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error();return await r.json();}catch{throw new AppError(502,'Call notes are unavailable. You can paste notes manually.');}}
-async function withFocus(store,rows){const profile=await store.get(profileId);const views=await store.all(['kind','Eq','personalization']);const byId=new Map(views.map(v=>[v.entryId,v]));return rows.map(entry=>{const view=byId.get(entry.id);return {...entry,personalization:view?{...view,stale:stale(view,entry,profile)}:null};});}
+async function withFocus(store,rows){try{const [profile,views]=await Promise.all([store.get(profileId),store.all(['kind','Eq','personalization'])]);const byId=new Map(views.map(v=>[v.entryId,v]));return rows.map(entry=>{const view=byId.get(entry.id);return {...entry,personalization:view?{...view,stale:stale(view,entry,profile)}:null};});}catch{return rows.map(entry=>({...entry,personalization:null,focusUnavailable:true}));}}
 async function blockerEvidence(store,ids){const result=[];for(const id of ids){const b=await store.get(id);if(b?.kind!=='blocker')throw new AppError(400,'Unknown blocker');result.push(b.title+'\n'+(b.history[0]?.evidence??''));}return result;}
 export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
  const url=new URL(req.url),p=url.pathname,m=req.method;
@@ -43,7 +43,7 @@ export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
   const focusMatch=p.match(/^\/api\/entries\/([\w-]+)\/personalization$/);
   if(focusMatch){
    const entry=await store.get(focusMatch[1]);if(!entry||entry.kind!=='note')throw new AppError(404,'Standup not found');
-   const old=await store.get(await overlayId(entry.id)),profile=await store.get(profileId);
+   const [old,profile]=await Promise.all([store.get(await overlayId(entry.id)),store.get(profileId)]);
    if(m==='GET')return json({personalization:old?{...old,stale:stale(old,entry,profile)}:null});
    if(m==='PUT'){const b=await body(req);if(b.revision!==(old?.revision??0))throw new AppError(409,'Personalized view changed. Load the latest view.');const value=overlayInput(b.personalization,entry,profile);const personalization={...documentBase(await overlayId(entry.id),'personalization'),...value,entryId:entry.id,revision:(old?.revision??0)+1,updatedAt:new Date().toISOString()};await store.put(personalization,old?.revision??null);return json({personalization:{...personalization,stale:false}});}
   }
