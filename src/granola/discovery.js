@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto';
-const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value==='object' ? Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])])) : value;
+const hash = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 export function range(from, to) {
   for (const value of [from,to]) if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) throw Error('Explicit ISO timestamps with timezone required');
   if (Date.parse(from) >= Date.parse(to)) throw Error('Range must have from < to (exclusive)');
@@ -19,6 +20,7 @@ export async function discover(api, {from,to,client, checkpoint = null, save = a
   if (checkpoint && JSON.stringify(checkpoint.scope) !== JSON.stringify(scope)) throw Error('Checkpoint scope mismatch');
   const state = checkpoint ?? {format:'granola-candidates-v1',scope,candidates:[],excluded:[],failures:[],cursor:null,complete:false,scanned:0};
   if (state.complete) return state;
+  state.failures = state.failures.filter(f=>f.id);
   const known = new Set([...state.candidates,...state.excluded].map(c=>c.id));
   try {
     // List all creation dates: date filters apply to note creation, not meeting time.
@@ -53,7 +55,8 @@ export function reviewTemplate(scan) {
   return {format:'granola-review-v1',reviews:scan.candidates.map(c=>({id:c.id,evidenceHash:c.evidenceHash,decision:'ambiguous',reason:'',client:scan.scope.client,projects:[],evidence:[],contextReason:'',relatedSources:[]}))};
 }
 export function reviewedNote(c, r, scope) {
-  if (r.evidenceHash !== c.evidenceHash || c.revision !== c.source.revision) throw Error('Stale review');
+  if (r.evidenceHash !== c.evidenceHash || c.evidenceHash !== hash({source:c.source,timeBasis:c.timeBasis}) || c.revision !== c.source.revision) throw Error('Stale review');
+  if (JSON.stringify(c.transcript) !== c.source.transcript) throw Error('Transcript evidence mismatch');
   if (r.client !== scope.client || !r.contextReason?.trim() || !r.reason?.trim()) throw Error('Explicit client evidence and reason required');
   if (!Array.isArray(r.projects) || !r.projects.length || r.projects.some(p=>typeof p!=='string'||!p.trim())) throw Error('Projects required');
   if (!Array.isArray(r.evidence) || !r.evidence.length) throw Error('Transcript evidence required');
@@ -82,6 +85,7 @@ export async function importReviewed(scan, review, {request, dryRun = true, save
   for (const r of review.reviews) {
     if (ids.has(r.id)) throw Error('Duplicate review'); ids.add(r.id);
     const c = scan.candidates.find(c=>c.id===r.id); if (!c) throw Error('Unknown candidate');
+    if (!['accepted','ambiguous','excluded'].includes(r.decision)) throw Error('Invalid decision');
     if (r.decision==='excluded') { if (!r.reason?.trim()) throw Error('Exclusion reason required'); report.excluded++; continue; }
     if (r.decision!=='accepted') { report.ambiguous++; continue; }
     planned.push(reviewedNote(c,r,scan.scope)); report.qualifying++;

@@ -4,7 +4,7 @@ description: Discover historical Granola standups by reviewing transcript eviden
 ---
 
 Use the installed Standup checkout's `bin/granola-standup.js`. Read
-[the CLI contract](../../docs/granola.md) before discovery/import. Run `help` to
+[the CLI contract](references/cli.md) before discovery/import. Run `help` to
 verify paths and interface. If the checkout is elsewhere, use its absolute path.
 Credentials belong in environment/secret-manager injection on the laptop or
 private server. Keep real meetings, candidate files and review output local;
