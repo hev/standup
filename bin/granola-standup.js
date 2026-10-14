@@ -8,7 +8,7 @@ export const help = `Granola standup discovery (Node 22+, laptop or private serv
   discover --from ISO_WITH_ZONE --to EXCLUSIVE_ISO_WITH_ZONE --client CLIENT --out PRIVATE.json [--resume]
   review-template --candidates PRIVATE.json --out REVIEW.json
   import --candidates PRIVATE.json --review REVIEW.json --out REPORT.json [--apply]
-Environment: GRANOLA_API_KEY for discovery; STANDUP_URL and STANDUP_TOKEN for apply.
+Environment: GRANOLA_API_KEY for discovery; STANDUP_URL plus STANDUP_TOKEN (or STANDUP_AUTH=identity) for apply.
 All meeting pages and transcript pages are read, including null/misleading titles.
 Candidates are unverified. Review every transcript for content and client evidence.
 Import defaults to dry run; --apply requires an authenticated writable private app.
@@ -21,13 +21,13 @@ export async function privateWrite(path, data) {
   try { await f.writeFile(JSON.stringify(data,null,2)+'\n'); await f.sync(); } finally { await f.close(); }
   await rename(tmp,path); await chmod(path,0o600);
 }
-export function appRequest({url=process.env.STANDUP_URL,token=process.env.STANDUP_TOKEN,fetchImpl=fetch}={}) {
-  if (!url || !token) throw Error('STANDUP_URL and STANDUP_TOKEN required');
+export function appRequest({url=process.env.STANDUP_URL,token=process.env.STANDUP_TOKEN,auth=process.env.STANDUP_AUTH,fetchImpl=fetch}={}) {
+  if (!url || (!token && auth!=='identity')) throw Error('STANDUP_URL plus STANDUP_TOKEN or explicit STANDUP_AUTH=identity required');
   const base = new URL(url);
   if (base.username || base.password || (base.protocol!=='https:' && !(base.protocol==='http:' && ['localhost','127.0.0.1','[::1]'].includes(base.hostname)))) throw Error('Private URL must use HTTPS (or loopback HTTP)');
   return async (path,{method='GET',data}={}) => {
     let r;
-    try { r=await fetchImpl(new URL(path,base),{method,redirect:'error',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined,signal:AbortSignal.timeout(30000)}); }
+    try { r=await fetchImpl(new URL(path,base),{method,redirect:'error',headers:{...(token?{Authorization:'Bearer '+token}:{}),'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined,signal:AbortSignal.timeout(30000)}); }
     catch { throw Error('PRIVATE_APP_NETWORK_FAILURE'); }
     if (!r.ok) throw Error('PRIVATE_APP_HTTP_'+r.status);
     try { return await r.json(); } catch { throw Error('PRIVATE_APP_INVALID_JSON'); }
@@ -62,4 +62,4 @@ export async function main(args) {
   await privateWrite(opts.out,result);
   console.log(command==='import'?JSON.stringify(result):'Review template written locally');
 }
-if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) main(process.argv.slice(2)).catch(()=>{console.error('Operation failed. Check options, local JSON and credentials; no meeting content or remote error body is logged.');process.exitCode=1;});
+if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) main(process.argv.slice(2)).catch(e=>{const safe=e instanceof SyntaxError || (e.code && !String(e.code).startsWith('GRANOLA_')) ? 'Invalid local JSON or file access; check private paths and permissions.' : e.message;console.error(safe);process.exitCode=1;});

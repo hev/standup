@@ -110,6 +110,12 @@ skill directory, for example `~/.claude/skills/granola-standup`. Existing unrela
 skills are preserved. The link keeps the skill's CLI and reference documentation
 at the same code revision; moving or removing the checkout breaks the link.
 Use the absolute checkout path printed by the installer when invoking the CLI.
+For an existing authenticated identity gateway, set `STANDUP_AUTH=identity`
+instead of a client token. This explicitly selects gateway authentication;
+`/api/config` must still succeed and report writable private mode before any
+meeting is submitted. The CLI does not bypass authentication or manufacture
+identity headers.
+
 The generic workflow can also be referenced by a consolidated Standup skill in
 an independently maintained skills repository; no account-specific facts are
 needed in that integration.

@@ -101,3 +101,7 @@ test('large mixed meeting supports explicitly reviewed excerpts with full local 
  assert.equal(JSON.parse(sent.source.transcript).length,2);assert(sent.notes.includes('reviewed_excerpt'));assert.equal(s.candidates[0].source.transcript,original);
  r.reviews[0].transcriptTurns=[0];await assert.rejects(importReviewed(s,r,{}),/every cited/);
 });
+test('explicit identity gateway mode authenticates config before payload and never forges identity',async()=>{
+ const calls=[];const request=appRequest({url:'https://private.example',auth:'identity',token:null,fetchImpl:async(url,init)=>{calls.push({path:new URL(url).pathname,...init});return new URL(url).pathname==='/api/config'?json({mode:'private',readOnly:false}):json({entry:{id:'identity-entry'}});}});
+ const s=scanFor();assert.equal((await importReviewed(s,accept(s),{dryRun:false,request})).imported,1);assert.equal(calls[0].path,'/api/config');assert.equal(calls[0].body,undefined);assert.equal(calls[0].headers.Authorization,undefined);assert.equal(calls[1].headers['Tailscale-User-Login'],undefined);
+});
