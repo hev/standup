@@ -8,3 +8,4 @@
 .subtitle{color:#69778d}.eyebrow,.nav-label{color:#6e7b90}.entry-excerpt{font-size:13px;color:#68778e;line-height:1.8}.entry-title{font-size:16px}.project-tag{color:#748197}.card-footer{color:#75839a}.client-tag{color:#885e40}.client-tag.cedar{color:#487460}.client-tag.north{color:#75608e}.detail-section p,.detail-section pre{font-size:15px;line-height:1.85}.day-label .day-month{color:#748198}.form-intro{color:#718098}.demo-note>span:last-child{color:#6b7d97}.entry-card:focus-visible{outline-color:#6e8bff;border-color:#a4b8ef}
 @media(max-width:760px){.entry-title{font-size:15px}.entry-excerpt{font-size:12px}.detail-section p,.detail-section pre{font-size:14px}.project-tag{font-size:10px}}
 @media(min-width:1450px){.entry-excerpt{font-size:13px}}
+.search-box:focus-within{border-color:#7188ee;box-shadow:0 0 0 3px #4263e926}.search-box input:focus-visible{outline:2px solid #7891f0;outline-offset:2px;border-radius:3px}
