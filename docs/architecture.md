@@ -20,8 +20,8 @@ writes with real backend tests. Exact fetch may involve gateway cache state;
 verify conditional writes/readback explicitly. If a required guarantee is absent,
 record a minimal reproduction before adding a transactional service.
 
-API reference inspected: Layer gateway OpenAPI at
-`1bd1253a66f87be964f8e7e415f2d073c2898bc9` (2026-10-14).
+API reference: [Layer documentation](https://hevlayer.com/docs), inspected
+2026-10-14. Verify your installed gateway version before using native extensions.
 Frontend/deployment reference: `hev/hybrid-text-fusion-demo` at
 `d8593a2fd05ce21fc283486d0299bb81c9d317bd`: Worker/static assets, server-side proxy,
 custom domain and backend key stored as a Worker secret.
