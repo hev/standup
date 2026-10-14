@@ -93,3 +93,11 @@ test('checkout skill install preserves existing skills and resolves portable doc
  const {install}=await import('../scripts/install-granola-skill.mjs');const dir=await mkdtemp(join(tmpdir(),'standup-skill-'));
  try {const path=join(dir,'skills','granola-standup');await install(path);await install(path);assert((await readFile(join(path,'SKILL.md'),'utf8')).includes('granola-standup'));assert((await readFile(join(path,'references/cli.md'),'utf8')).includes('Historical Granola'));}finally{await rm(dir,{recursive:true});}
 });
+test('large mixed meeting supports explicitly reviewed excerpts with full local evidence retained',async()=>{
+ const n=note();n.transcript.push({text:'Unrelated deep architecture discussion. '.repeat(1000),start_time:'2026-10-14T09:10:00-04:00'});
+ const s=scanFor(candidate(n)),r=accept(s);const original=s.candidates[0].source.transcript;
+ Object.assign(r.reviews[0],{transcriptTurns:[0,1],excerptReason:'Retain standup portion; full discussion retained locally'});
+ let sent;assert.equal((await importReviewed(s,r,{dryRun:false,request:async(p,o)=>p==='/api/config'?{mode:'private',readOnly:false}:(sent=o.data,{entry:{id:'fake'}})})).imported,1);
+ assert.equal(JSON.parse(sent.source.transcript).length,2);assert(sent.notes.includes('reviewed_excerpt'));assert.equal(s.candidates[0].source.transcript,original);
+ r.reviews[0].transcriptTurns=[0];await assert.rejects(importReviewed(s,r,{}),/every cited/);
+});

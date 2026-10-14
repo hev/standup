@@ -72,9 +72,19 @@ export function reviewedNote(c, r, scope) {
   if (c.timeBasis !== 'transcript' && !r.timeReason?.trim()) throw Error('Confirm actual meeting time with timeReason');
   range(scope.from,scope.to);
   if (!time || !/(Z|[+-]\d{2}:\d{2})$/.test(time) || !(Date.parse(time)>=Date.parse(scope.from) && Date.parse(time)<Date.parse(scope.to))) throw Error('Actual meeting time must be inside scope with timezone');
-  const provenance = {reviewReason:r.reason,contextReason:r.contextReason,evidence:r.evidence,sourceUpdatedAt:c.sourceUpdatedAt,timeBasis:c.timeBasis,timeReason:r.timeReason ?? null,relatedSources:r.relatedSources ?? []};
-  const note = {title:c.title || 'Untitled standup',client:r.client,projects:r.projects,date:time.slice(0,10),type:'standup',progress:'',next:'',blockerIds:[],notes:'Imported meeting evidence; proposals and speaker attribution remain unverified.\n'+JSON.stringify(provenance),source:{...c.source,time}};
-  for (const value of [note.notes,note.source.summary,note.source.transcript]) if (value.length>12000) throw Error('App field limit exceeded; preserve local original and use an explicitly reviewed excerpt with the private owner');
+  let transcript = c.source.transcript, summary = c.source.summary;
+  if (r.transcriptTurns !== undefined) {
+    if (!Array.isArray(r.transcriptTurns) || !r.transcriptTurns.length || new Set(r.transcriptTurns).size !== r.transcriptTurns.length || r.transcriptTurns.some(i=>!Number.isInteger(i)||!c.transcript[i]) || r.evidence.some(e=>!r.transcriptTurns.includes(e.turn))) throw Error('Reviewed excerpt must include every cited evidence turn');
+    if (!r.excerptReason?.trim()) throw Error('Explicit excerpt reason required');
+    transcript = JSON.stringify(r.transcriptTurns.map(i=>c.transcript[i]));
+  }
+  if (r.summaryExcerpt !== undefined) {
+    if (typeof r.summaryExcerpt!=='string' || !r.summaryExcerpt.trim() || !c.source.summary.includes(r.summaryExcerpt) || !r.excerptReason?.trim()) throw Error('Summary excerpt must be exact source text with reason');
+    summary = r.summaryExcerpt;
+  }
+  const provenance = {evidenceRetention:{transcript:r.transcriptTurns ? 'reviewed_excerpt' : 'complete', summary:r.summaryExcerpt !== undefined ? 'reviewed_excerpt' : 'complete', originalTranscriptTurns:c.transcript.length, sourceEvidenceHash:c.evidenceHash, excerptReason:r.excerptReason ?? null, originals:'Retained in private local candidate file'},reviewReason:r.reason,contextReason:r.contextReason,evidence:r.evidence,sourceUpdatedAt:c.sourceUpdatedAt,timeBasis:c.timeBasis,timeReason:r.timeReason ?? null,relatedSources:r.relatedSources ?? []};
+  const note = {title:c.title || 'Untitled standup',client:r.client,projects:r.projects,date:time.slice(0,10),type:'standup',progress:'',next:'',blockerIds:[],notes:'Imported meeting evidence; proposals and speaker attribution remain unverified.\n'+JSON.stringify(provenance),source:{...c.source,time,summary,transcript}};
+  for (const value of [note.notes,note.source.summary,note.source.transcript]) if (value.length>12000) throw Error('App field limit exceeded; retain local original and explicitly select reviewed transcriptTurns/summaryExcerpt');
   return note;
 }
 export async function importReviewed(scan, review, {request, dryRun = true, save = async () => {}}) {

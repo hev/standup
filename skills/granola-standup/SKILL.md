@@ -36,8 +36,11 @@ mean zero matches. Apply accepted matches when the user has authorized that scop
 otherwise seek the specific missing authorization. Leave ambiguous meetings on the
 review list. The CLI requires an authenticated writable private app before it
 sends content. Verify private auth isolation with fictional canaries before a first
-real backfill. Oversized source fields fail without truncation; retain originals
-and report the app contract limitation. No background sync is part of this skill.
+real backfill. Oversized source fields fail without truncation. Retain the complete candidate
+file locally; explicitly select `transcriptTurns` and an `excerptReason` for a
+reviewed standup portion when appropriate. Include every cited turn, label the
+excerpt, and report that the full original remains local. Never choose an excerpt
+merely to hide contradictory evidence. No background sync is part of this skill.
 
 Report only counts/date range, exact code version, destination identity and safe
 status to shared tracking. Meeting bodies, evidence quotes and private identifiers

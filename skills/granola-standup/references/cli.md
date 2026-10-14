@@ -65,9 +65,16 @@ Imports preserve summary and transcript separately and keep progress/next empty:
 proposals never become decisions or the owner's commitments. Provenance includes
 classification reasons, evidence references and source update time. App v1 limits
 each source field to 12,000 characters; larger sources fail before any write.
-Do not silently truncate. Keep the original private evidence, arrange a reviewed
-excerpt with the private owner or extend the app contract separately. This CLI
-currently cannot import oversized transcripts losslessly.
+Do not silently truncate. Keep the original private candidate file. A reviewer may
+explicitly set `transcriptTurns:[0,1,...]` (original turn indexes) and `excerptReason`
+to import just the reviewed standup portion; every cited evidence turn must be
+included. `summaryExcerpt` may select an exact contiguous source summary passage
+with the same explicit reason. The imported provenance labels excerpts, records
+the full evidence hash and original turn count, and states that originals remain
+in the private local candidate file. This preserves originals locally while the
+app stores a clearly labeled excerpt. Without explicit excerpt selection,
+oversized imports fail before writing. Extending the app for full long-transcript
+storage is separate work.
 
 `--apply` authenticates `/api/config` before sending notes and refuses demo,
 sandbox, read-only and unauthenticated destinations. Use the private deployment's
