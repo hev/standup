@@ -4,6 +4,12 @@
 `APP_VERSION` set to the exact checkout commit. Public browser assets are in
 `public/`. The Worker injects the Layer key server-side.
 
+The repository also includes maintained `cloudflare.config.ts` and
+`wrangler.config.ts` for the modern `cf` CLI. `cf build` and `cf deploy` use
+that explicit Worker entrypoint; framework autodetection must not replace it
+with a static-only deployment. Both configuration paths expose the same
+server-side API and browser assets.
+
 For Cloudflare, configure your own account/domain and namespace in
 `wrangler.json`. The included route is the project's synthetic public demo;
 replace it for your own deployment. Store `LAYER_API_KEY` as a Worker secret.
