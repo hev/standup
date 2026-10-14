@@ -1,3 +1,4 @@
+import {profileId,overlayId,profileInput,overlayInput,stale,documentBase} from './personalization.js';
 import {validateNamespaces} from './config.js';
 import {AppError,required,text,note,date,source,stableId,filters} from './domain.js';
 import {PersonalAPI} from './granola/personal-api.js';
@@ -7,6 +8,7 @@ const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{stat
 async function equal(a,b){if(!a||!b)return false;const hash=async v=>new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)));const [x,y]=await Promise.all([hash(a),hash(b)]);let diff=0;for(let i=0;i<x.length;i++)diff|=x[i]^y[i];return diff===0;}
 async function body(req){if(Number(req.headers.get('content-length'))>100000)throw new AppError(413,'Request is too large');const raw=await req.text();if(raw.length>100000)throw new AppError(413,'Request is too large');try{return JSON.parse(raw);}catch{throw new AppError(400,'Invalid JSON');}}
 async function granola(env,path){if(!env.GRANOLA_API_KEY)throw new AppError(503,'Granola is not configured. Paste notes manually.');try{if(!env.GRANOLA_ADAPTER_URL){const id=path.match(/^\/calls\/([\w-]+)$/)?.[1];return await personalCalls(new PersonalAPI({token:env.GRANOLA_API_KEY}),id??null);}const r=await fetch(env.GRANOLA_ADAPTER_URL.replace(/\/$/,'')+path,{headers:{Authorization:`Bearer ${env.GRANOLA_API_KEY}`},signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error();return await r.json();}catch{throw new AppError(502,'Call notes are unavailable. You can paste notes manually.');}}
+async function withFocus(store,rows){try{const [profile,views]=await Promise.all([store.get(profileId),store.all(['kind','Eq','personalization'])]);const byId=new Map(views.map(v=>[v.entryId,v]));return rows.map(entry=>{const view=byId.get(entry.id);return {...entry,personalization:view?{...view,stale:stale(view,entry,profile)}:null};});}catch{return rows.map(entry=>({...entry,personalization:null,focusUnavailable:true}));}}
 async function blockerEvidence(store,ids){const result=[];for(const id of ids){const b=await store.get(id);if(b?.kind!=='blocker')throw new AppError(400,'Unknown blocker');result.push(b.title+'\n'+(b.history[0]?.evidence??''));}return result;}
 export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
  const url=new URL(req.url),p=url.pathname,m=req.method;
@@ -32,15 +34,27 @@ export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
   if(isDemo&&write)throw new AppError(403,'The public demo is read-only');
   if(p==='/api/search'&&env.SEARCH_DISABLED==='1')throw new AppError(503,'Search is unavailable in this preview. Timeline and notes are still available.');
   const store=storeFactory(env,isDemo?namespaces.demo:env.APP_MODE==='private'?namespaces.privateNotes:namespaces.sandbox);
-  if(p==='/api/config'&&m==='GET')return json({mode:env.APP_MODE,readOnly:isDemo,features:{structuredProvenance:true,nativeGranola:true},searchAvailable:env.SEARCH_DISABLED!=='1',granolaConfigured:!isDemo&&!!env.GRANOLA_API_KEY,expiresAt:env.APP_MODE==='sandbox'?env.SANDBOX_EXPIRES_AT:null});
-  if(p==='/api/entries'&&m==='GET'){
-   const rows=await store.all(filters(url.searchParams));rows.sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id));const offset=Number(url.searchParams.get('cursor')??0);if(!Number.isInteger(offset)||offset<0)throw new AppError(400,'Invalid cursor');return json({rows:rows.slice(offset,offset+50),cursor:rows.length>offset+50?String(offset+50):null});
+  if(p==='/api/config'&&m==='GET')return json({mode:env.APP_MODE,readOnly:isDemo,features:{structuredProvenance:true,nativeGranola:true,personalization:true},searchAvailable:env.SEARCH_DISABLED!=='1',granolaConfigured:!isDemo&&!!env.GRANOLA_API_KEY,expiresAt:env.APP_MODE==='sandbox'?env.SANDBOX_EXPIRES_AT:null});
+  if(p==='/api/profile'&&m==='GET')return json({profile:await store.get(profileId)});
+  if(p==='/api/profile'&&m==='PUT'){
+   const b=await body(req),old=await store.get(profileId);if(b.revision!==(old?.revision??0))throw new AppError(409,'Profile changed. Load the latest profile.');
+   const profile={...documentBase(profileId,'profile'),...profileInput(b),revision:(old?.revision??0)+1,updatedAt:new Date().toISOString()};await store.put(profile,old?.revision??null);return json({profile});
   }
-  if(p==='/api/search'&&m==='POST'){const b=await body(req);return json({rows:await store.search(required(b.query,'query',500),filters(new URLSearchParams(b.filters??{})))});}
+  const focusMatch=p.match(/^\/api\/entries\/([\w-]+)\/personalization$/);
+  if(focusMatch){
+   const entry=await store.get(focusMatch[1]);if(!entry||entry.kind!=='note')throw new AppError(404,'Standup not found');
+   const [old,profile]=await Promise.all([store.get(await overlayId(entry.id)),store.get(profileId)]);
+   if(m==='GET')return json({personalization:old?{...old,stale:stale(old,entry,profile)}:null});
+   if(m==='PUT'){const b=await body(req);if(b.revision!==(old?.revision??0))throw new AppError(409,'Personalized view changed. Load the latest view.');const value=overlayInput(b.personalization,entry,profile);const personalization={...documentBase(await overlayId(entry.id),'personalization'),...value,entryId:entry.id,revision:(old?.revision??0)+1,updatedAt:new Date().toISOString()};await store.put(personalization,old?.revision??null);return json({personalization:{...personalization,stale:false}});}
+  }
+  if(p==='/api/entries'&&m==='GET'){
+   const rows=await store.all(filters(url.searchParams));rows.sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id));const offset=Number(url.searchParams.get('cursor')??0);if(!Number.isInteger(offset)||offset<0)throw new AppError(400,'Invalid cursor');return json({rows:await withFocus(store,rows.slice(offset,offset+50)),cursor:rows.length>offset+50?String(offset+50):null});
+  }
+  if(p==='/api/search'&&m==='POST'){const b=await body(req);return json({rows:await withFocus(store,await store.search(required(b.query,'query',500),filters(new URLSearchParams(b.filters??{}))))});}
   // Public search is a GET so it remains a read-only route.
-  if(p==='/api/search'&&m==='GET')return json({rows:await store.search(required(url.searchParams.get('q'),'query',500),filters(url.searchParams))});
+  if(p==='/api/search'&&m==='GET')return json({rows:await withFocus(store,await store.search(required(url.searchParams.get('q'),'query',500),filters(url.searchParams)))});
   if(p==='/api/facets'&&m==='GET'){const rows=await store.all(filters(new URLSearchParams()));return json({clients:[...new Set(rows.map(n=>n.client))].sort(),projects:[...new Set(rows.flatMap(n=>n.projects))].sort()});}
-  if(p==='/api/export'&&m==='GET')return json({format:'standup-v1',entries:await store.all(filters(url.searchParams)),blockers:await store.all(['kind','Eq','blocker'])});
+  if(p==='/api/export'&&m==='GET')return json({format:'standup-v1',entries:await store.all(filters(url.searchParams)),blockers:await store.all(['kind','Eq','blocker']),profile:await store.get(profileId),personalizations:await store.all(['kind','Eq','personalization'])});
   if(p==='/api/entries'&&m==='POST'){
    const b=await body(req),n=note(b);const evidence=await blockerEvidence(store,n.blockerIds);
    const id=b.importKey?await stableId(['archive',required(b.importKey,'import key',1000),n.client,[...n.projects].sort()]):crypto.randomUUID();
