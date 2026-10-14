@@ -110,7 +110,8 @@ export async function importReviewed(scan, review, {request, dryRun = true, save
   if (config.mode!=='private' || config.readOnly!==false) throw Error('Authenticated writable private instance required');
   for (const note of planned) {
     try {
-      const result = await request('/api/import',{method:'POST',data:note});
+      const data=config.features?.structuredProvenance ? note : {...note,notes:JSON.stringify(note.provenance)};if(!config.features?.structuredProvenance)delete data.provenance;
+      const result = await request('/api/import',{method:'POST',data});
       if (!result.entry?.id) throw Error('Invalid import response');
       result.duplicate ? report.alreadyPresent++ : report.imported++;
     } catch { report.failures.push({code:'IMPORT_FAILED',index:report.imported+report.alreadyPresent}); await save(report); break; }
