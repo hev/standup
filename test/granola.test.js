@@ -36,7 +36,7 @@ test('mixed meeting accepted explicitly; proposals stay evidence; negative and a
  const s=scanFor();s.candidates.push(candidate({...note('negative','Daily standup'),transcript:[{text:'Welcome to the product sales presentation.',start_time:turns[0].start_time}]}));s.scanned++;
  const r=accept(s);Object.assign(r.reviews[1],{decision:'excluded',reason:'Sales presentation without team updates'});
  let sent;const report=await importReviewed(s,r,{dryRun:false,request:async(path,opts)=>path==='/api/config'?{mode:'private',readOnly:false}:(sent=opts.data,{entry:{id:'x'}})});
- assert.equal(report.qualifying,1);assert.equal(report.imported,1);assert.equal(report.excluded,1);assert.equal(sent.progress,'');assert.equal(sent.next,'');assert(sent.source.transcript.includes('perhaps replace'));assert(sent.notes.includes('likely_duplicate'));
+ assert.equal(report.qualifying,1);assert.equal(report.imported,1);assert.equal(report.excluded,1);assert.equal(sent.progress,'');assert.equal(sent.next,'');assert(sent.source.transcript.includes('perhaps replace'));assert(JSON.stringify(sent.provenance).includes('likely_duplicate'));
  r.reviews[1].decision='ambiguous';assert.equal((await importReviewed(s,r,{})).ambiguous,1);
 });
 test('failed fetch is incomplete, sanitized, checkpoint resumes failed page without duplication',async()=>{
@@ -98,7 +98,7 @@ test('large mixed meeting supports explicitly reviewed excerpts with full local 
  const s=scanFor(candidate(n)),r=accept(s);const original=s.candidates[0].source.transcript;
  Object.assign(r.reviews[0],{transcriptTurns:[0,1],excerptReason:'Retain standup portion; full discussion retained locally'});
  let sent;assert.equal((await importReviewed(s,r,{dryRun:false,request:async(p,o)=>p==='/api/config'?{mode:'private',readOnly:false}:(sent=o.data,{entry:{id:'fake'}})})).imported,1);
- assert.equal(JSON.parse(sent.source.transcript).length,2);assert(sent.notes.includes('reviewed_excerpt'));assert.equal(s.candidates[0].source.transcript,original);
+ assert.equal(JSON.parse(sent.source.transcript).length,2);assert(JSON.stringify(sent.provenance).includes('reviewed_excerpt'));assert.equal(s.candidates[0].source.transcript,original);
  r.reviews[0].transcriptTurns=[0];await assert.rejects(importReviewed(s,r,{}),/every cited/);
 });
 test('explicit identity gateway mode authenticates config before payload and never forges identity',async()=>{

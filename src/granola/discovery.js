@@ -87,8 +87,8 @@ export function reviewedNote(c, r, scope) {
     summary = r.summaryExcerpt;
   }
   const provenance = {evidenceRetention:{transcript:r.transcriptTurns ? 'reviewed_excerpt' : c.transcriptComplete===false ? 'cached_excerpt_or_missing' : 'complete', summary:r.summaryExcerpt !== undefined ? 'reviewed_excerpt' : 'complete', originalTranscriptTurns:c.transcript.length, sourceEvidenceHash:c.evidenceHash, fullEvidenceHash:c.fullEvidenceHash, revisionBasis:c.revisionBasis, excerptReason:r.excerptReason ?? null, originals:c.transcriptComplete===false ? 'Full transcript remains at original Granola URL; cache contains partial evidence only' : 'Retained in private local candidate file and original Granola URL'},reviewReason:r.reason,contextReason:r.contextReason,evidence:r.evidence,sourceUpdatedAt:c.sourceUpdatedAt,timeBasis:c.timeBasis,timeReason:r.timeReason ?? null,relatedSources:r.relatedSources ?? []};
-  const note = {title:c.title || 'Untitled standup',client:r.client,projects:r.projects,date:time.slice(0,10),type:'standup',progress:'',next:'',blockerIds:[],notes:'Imported meeting evidence; proposals and speaker attribution remain unverified.\n'+JSON.stringify(provenance),source:{...c.source,time,summary,transcript}};
-  for (const value of [note.notes,note.source.summary,note.source.transcript]) if (value.length>12000) throw Error('App field limit exceeded; retain local original and explicitly select reviewed transcriptTurns/summaryExcerpt');
+  const note = {title:c.title || 'Untitled standup',client:r.client,projects:r.projects,date:time.slice(0,10),type:'standup',progress:'',next:'',blockerIds:[],notes:'Imported meeting evidence. Proposals remain proposals; speaker attribution may be ambiguous.',provenance,source:{...c.source,time,summary,transcript}};
+  for (const value of [JSON.stringify(note.provenance),note.notes,note.source.summary,note.source.transcript]) if (value.length>12000) throw Error('App field limit exceeded; retain local original and explicitly select reviewed transcriptTurns/summaryExcerpt');
   return note;
 }
 export async function importReviewed(scan, review, {request, dryRun = true, save = async () => {}}) {

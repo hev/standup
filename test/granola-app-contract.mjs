@@ -9,7 +9,7 @@ test('Granola CLI interoperates with exact app handler: private auth, stable imp
  const {handle}=await import(pathToFileURL(resolve(process.env.STANDUP_APP_CHECKOUT,'src/worker.js')));
  const rows=new Map();const namespaces=[];
  const store={get:async id=>rows.get(id),put:async(doc)=>{assert(!rows.has(doc.id));rows.set(doc.id,doc);}};
- const env={APP_MODE:'private',OWNER_TOKEN:'fictional-owner-token',DEMO_NAMESPACE:'fictional-demo',PRIVATE_NAMESPACE:'fictional-private',SANDBOX_NAMESPACE:'fictional-sandbox'};
+ const env={APP_MODE:'private',OWNER_TOKEN:'fictional-owner-token-for-contract-123456789',DEMO_NAMESPACE:'fictional-demo',PRIVATE_NAMESPACE:'fictional-private',SANDBOX_NAMESPACE:'fictional-sandbox'};
  const fetchImpl=(url,init)=>handle(new Request(url,init),env,(e,ns)=>{namespaces.push(ns);return store;});
  const request=appRequest({url:'https://app.test',token:env.OWNER_TOKEN,fetchImpl});
  const scope={from:'2026-10-01T00:00:00Z',to:'2026-10-15T00:00:00Z',client:'Fictional Harbor'};

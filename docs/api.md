@@ -72,9 +72,14 @@ Bearer auth to this adapter, never to the browser. The adapter implements:
 - `GET /calls` → `{calls:[{id,title,time}]}` (bounded recent list).
 - `GET /calls/ID` → `{id,revision,type:"granola",url,time,summary,transcript}`.
 
-This boundary lets an owner use their permitted Granola integration; the app
-ships a synthetic test adapter, not a native account connector. No personal
+If `GRANOLA_API_KEY` is set without an adapter URL, the server uses the Granola
+Personal API: a bounded recent-note page and selected note transcript pages.
+An adapter URL overrides this for another permitted integration or fixtures. No personal
 notes are required. Call IDs in this version must match letters/digits/`_`/`-`.
 An unavailable adapter leaves manual paste/preview usable. The draft has empty
 progress/next; summary (or transcript if no summary) goes into editable notes.
 No speaker's proposals are promoted into decisions or the owner's commitments.
+
+Optional `provenance` objects (maximum 12,000 serialized characters) retain
+import review/evidence-retention metadata separately from readable notes. A
+source can also carry provenance such as scheduled versus transcript time.

@@ -1,10 +1,12 @@
 import {validateNamespaces} from './config.js';
 import {AppError,required,text,note,date,source,stableId,filters} from './domain.js';
+import {PersonalAPI} from './granola/personal-api.js';
+import {calls as personalCalls} from './granola/adapter.js';
 import {LayerStore} from './layer.js';
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers}});
 async function equal(a,b){if(!a||!b)return false;const hash=async v=>new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)));const [x,y]=await Promise.all([hash(a),hash(b)]);let diff=0;for(let i=0;i<x.length;i++)diff|=x[i]^y[i];return diff===0;}
 async function body(req){if(Number(req.headers.get('content-length'))>100000)throw new AppError(413,'Request is too large');const raw=await req.text();if(raw.length>100000)throw new AppError(413,'Request is too large');try{return JSON.parse(raw);}catch{throw new AppError(400,'Invalid JSON');}}
-async function granola(env,path){if(!env.GRANOLA_ADAPTER_URL || !env.GRANOLA_API_KEY)throw new AppError(503,'Granola is not configured. Paste notes manually.');try{const r=await fetch(env.GRANOLA_ADAPTER_URL.replace(/\/$/,'')+path,{headers:{Authorization:`Bearer ${env.GRANOLA_API_KEY}`},signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error();return await r.json();}catch{throw new AppError(502,'Call notes are unavailable. You can paste notes manually.');}}
+async function granola(env,path){if(!env.GRANOLA_API_KEY)throw new AppError(503,'Granola is not configured. Paste notes manually.');try{if(!env.GRANOLA_ADAPTER_URL){const id=path.match(/^\/calls\/([\w-]+)$/)?.[1];return await personalCalls(new PersonalAPI({token:env.GRANOLA_API_KEY}),id??null);}const r=await fetch(env.GRANOLA_ADAPTER_URL.replace(/\/$/,'')+path,{headers:{Authorization:`Bearer ${env.GRANOLA_API_KEY}`},signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error();return await r.json();}catch{throw new AppError(502,'Call notes are unavailable. You can paste notes manually.');}}
 async function blockerEvidence(store,ids){const result=[];for(const id of ids){const b=await store.get(id);if(b?.kind!=='blocker')throw new AppError(400,'Unknown blocker');result.push(b.title+'\n'+(b.history[0]?.evidence??''));}return result;}
 export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
  const url=new URL(req.url),p=url.pathname,m=req.method;
@@ -30,7 +32,7 @@ export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
   if(isDemo&&write)throw new AppError(403,'The public demo is read-only');
   if(p==='/api/search'&&env.SEARCH_DISABLED==='1')throw new AppError(503,'Search is unavailable in this preview. Timeline and notes are still available.');
   const store=storeFactory(env,isDemo?namespaces.demo:env.APP_MODE==='private'?namespaces.privateNotes:namespaces.sandbox);
-  if(p==='/api/config'&&m==='GET')return json({mode:env.APP_MODE,readOnly:isDemo,searchAvailable:env.SEARCH_DISABLED!=='1',granolaConfigured:!isDemo&&!!env.GRANOLA_ADAPTER_URL,expiresAt:env.APP_MODE==='sandbox'?env.SANDBOX_EXPIRES_AT:null});
+  if(p==='/api/config'&&m==='GET')return json({mode:env.APP_MODE,readOnly:isDemo,searchAvailable:env.SEARCH_DISABLED!=='1',granolaConfigured:!isDemo&&!!env.GRANOLA_API_KEY,expiresAt:env.APP_MODE==='sandbox'?env.SANDBOX_EXPIRES_AT:null});
   if(p==='/api/entries'&&m==='GET'){
    const rows=await store.all(filters(url.searchParams));rows.sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id));const offset=Number(url.searchParams.get('cursor')??0);if(!Number.isInteger(offset)||offset<0)throw new AppError(400,'Invalid cursor');return json({rows:rows.slice(offset,offset+50),cursor:rows.length>offset+50?String(offset+50):null});
   }
@@ -55,7 +57,7 @@ export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
   if(isDemo&&p.startsWith('/api/calls'))throw new AppError(403,'Calls are private to the owner');
   if(p==='/api/calls'&&m==='GET')return json({calls:(await granola(env,'/calls')).calls});
   const callMatch=p.match(/^\/api\/calls\/([\w-]+)$/);if(callMatch&&m==='GET')return json({call:await granola(env,'/calls/'+callMatch[1])});
-  if(p==='/api/import/preview'&&m==='POST'){const b=await body(req);const s=source(b.source);if(!s)throw new AppError(400,'Choose a source');return json({source:s,draft:{title:'Call notes',progress:'',next:'',notes:s.summary||s.transcript},warning:'Editable draft. Speaker attribution may be ambiguous; proposals are not decisions or personal commitments.'});}
+  if(p==='/api/import/preview'&&m==='POST'){const b=await body(req);const s=source(b.source);if(!s)throw new AppError(400,'Choose a source');return json({source:s,draft:{title:'Call notes',progress:'',next:'',notes:s.summary||s.transcript},warning:'Editable draft. Speaker attribution may be ambiguous; proposals are not decisions or personal commitments.'+(s.provenance?.timeBasis==='scheduled'?' The source time is scheduled; verify the actual call time.':'')});}
   if(p==='/api/import'&&m==='POST'){
    const b=await body(req),n=note(b);if(!n.source)throw new AppError(400,'Source is required');
    const id=await stableId([n.source.type,n.source.id,n.source.revision,n.client,[...n.projects].sort()]);const old=await store.get(id);if(old)return json({entry:old,duplicate:true});const evidence=await blockerEvidence(store,n.blockerIds);

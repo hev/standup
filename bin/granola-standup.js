@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {realpathSync} from 'node:fs';
 import {readFile,open,rename,chmod} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -45,7 +46,7 @@ export async function main(args) {
     else { if(!rest[i+1]||rest[i+1].startsWith('--'))throw Error('Missing option value'); opts[key]=rest[++i]; }
   }
   if (!opts.out) throw Error('--out required');
-  for(const input of [opts.candidates,opts.review].filter(Boolean)) if(resolve(input)===resolve(opts.out)) throw Error('Output must differ from input');
+  for(const input of [opts.candidates,opts.review,opts.cache].filter(Boolean)) if(resolve(input)===resolve(opts.out)) throw Error('Output must differ from input');
   const read=async p=>JSON.parse(await readFile(p,'utf8'));
   let result;
   if(command==='discover') {
@@ -65,4 +66,4 @@ export async function main(args) {
   await privateWrite(opts.out,result);
   console.log(command==='import'?JSON.stringify(result):'Review template written locally');
 }
-if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) main(process.argv.slice(2)).catch(e=>{const safe=e instanceof SyntaxError || (e.code && !String(e.code).startsWith('GRANOLA_')) ? 'Invalid local JSON or file access; check private paths and permissions.' : e.message;console.error(safe);process.exitCode=1;});
+if(process.argv[1] && import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href) main(process.argv.slice(2)).catch(e=>{const safe=e instanceof SyntaxError || (e.code && !String(e.code).startsWith('GRANOLA_')) ? 'Invalid local JSON or file access; check private paths and permissions.' : e.message;console.error(safe);process.exitCode=1;});

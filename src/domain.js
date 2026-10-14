@@ -5,9 +5,11 @@ export function text(value, name, max = 12000) {
 }
 export function required(value, name, max = 120) { const v = text(value, name, max); if (!v) throw new AppError(400, `${name} is required`); return v; }
 export function date(value) { const parsed=typeof value==='string'?new Date(value+'T00:00:00Z'):new Date(NaN); if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0,10)!==value) throw new AppError(400,'Invalid date'); return value; }
+export function provenance(value){if(value===null)return null;if(!value||typeof value!=='object'||Array.isArray(value)||JSON.stringify(value).length>12000)throw new AppError(400,'Invalid provenance');return value;}
 export function source(value) {
   if (!value) return null;
   const s = {id:required(value.id,'source ID',500),revision:required(String(value.revision ?? ''),'source revision',200),type:required(value.type,'source type'),url:text(value.url??'','source URL',2000),time:text(value.time??'','source time',100),summary:text(value.summary??'','summary'),transcript:text(value.transcript??'','transcript')};
+  if(value.provenance!==undefined)s.provenance=provenance(value.provenance);
   if (s.url && !/^https?:\/\//.test(s.url)) throw new AppError(400,'Source URL must use HTTP or HTTPS');
   return s;
 }
@@ -17,6 +19,7 @@ export function note(input) {
   const n = {client:required(input.client,'client'), projects:[...new Set(projects.map(p=>required(p,'project')))], date:date(input.date),type:input.type??'standup',title:required(input.title,'title',200),progress:text(input.progress??'','progress'),next:text(input.next??'','next'),notes:text(input.notes??'','notes'),blockerIds:input.blockerIds??[],source:source(input.source)};
   if (!['standup','call','planning'].includes(n.type)) throw new AppError(400,'Invalid note type');
   if (!Array.isArray(n.blockerIds) || n.blockerIds.length>20 || n.blockerIds.some(id=>typeof id!=='string'|| !/^[\w-]{1,100}$/.test(id))) throw new AppError(400,'Invalid blocker IDs');
+  if(input.provenance!==undefined)n.provenance=provenance(input.provenance);
   if (!n.progress && !n.next && !n.notes) throw new AppError(400,'Write progress, next steps or notes');
   return n;
 }

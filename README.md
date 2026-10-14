@@ -72,8 +72,11 @@ Time/billing remains with the user's existing workflow.
 
 Manual paste always works. A configured server adapter can provide recent calls
 and a selected call, following [the adapter contract](docs/api.md#optional-call-adapter).
-This repository supplies a deterministic fictional adapter for acceptance; it
-does not claim a native Granola account integration or fetch personal notes.
+The server can use the native Granola Personal API with a server-side key, or
+an optional adapter URL. The historical discovery CLI reads all pages, including
+null/misleading titles, and requires explicit transcript/context evidence review
+before private imports. See [Granola discovery](docs/granola.md). Acceptance uses
+fictional fixtures; no personal notes are fetched during builds or tests.
 Preview and edit before importing into an explicit client/project context.
 Summary and transcript stay separate. Source ID + revision + context prevents
 retry duplication; proposals are never extracted as decisions or commitments.

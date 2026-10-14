@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test src/*.test.js test/*.test.js",
+    "test": "STANDUP_APP_CHECKOUT=. node --test",
     "build": "node scripts/build.mjs",
     "start": "node --env-file-if-exists=.env scripts/server.mjs",
     "seed": "node scripts/seed.mjs",
@@ -22,6 +22,7 @@
   },
   "description": "Capture and search standups across contexts with Layer",
   "bin": {
-    "standup": "scripts/cli.mjs"
+    "standup": "scripts/cli.mjs",
+    "granola-standup": "bin/granola-standup.js"
   }
 }
