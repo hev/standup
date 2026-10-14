@@ -24,12 +24,12 @@ export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
    return json({ok:true},200,{'Set-Cookie':`standup_session=${env.OWNER_TOKEN}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${url.protocol==='https:'?'; Secure':''}`});
   }
   if(!isDemo && !await equal(supplied,env.OWNER_TOKEN))throw new AppError(401,'Sign in to your private standups');
-  if(env.APP_MODE==='sandbox'&&(!env.SANDBOX_EXPIRES_AT || Date.now()>=Date.parse(env.SANDBOX_EXPIRES_AT)))throw new AppError(410,'This sandbox has expired');
+  if(env.APP_MODE==='sandbox'&&(!env.SANDBOX_EXPIRES_AT || !Number.isFinite(Date.parse(env.SANDBOX_EXPIRES_AT)) || Date.now()>=Date.parse(env.SANDBOX_EXPIRES_AT)))throw new AppError(410,'This sandbox has expired');
   if(isDemo&&write)throw new AppError(403,'The public demo is read-only');
   const store=storeFactory(env,isDemo?namespaces.demo:env.APP_MODE==='private'?namespaces.privateNotes:namespaces.sandbox);
-  if(p==='/api/config'&&m==='GET')return json({mode:env.APP_MODE,readOnly:isDemo,granolaConfigured:!!env.GRANOLA_ADAPTER_URL,expiresAt:env.APP_MODE==='sandbox'?env.SANDBOX_EXPIRES_AT:null});
+  if(p==='/api/config'&&m==='GET')return json({mode:env.APP_MODE,readOnly:isDemo,granolaConfigured:!isDemo&&!!env.GRANOLA_ADAPTER_URL,expiresAt:env.APP_MODE==='sandbox'?env.SANDBOX_EXPIRES_AT:null});
   if(p==='/api/entries'&&m==='GET'){
-   const result=await store.list(filters(url.searchParams),url.searchParams.get('cursor'));result.rows.sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));return json(result);
+   const rows=await store.all(filters(url.searchParams));rows.sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id));const offset=Number(url.searchParams.get('cursor')??0);if(!Number.isInteger(offset)||offset<0)throw new AppError(400,'Invalid cursor');return json({rows:rows.slice(offset,offset+50),cursor:rows.length>offset+50?String(offset+50):null});
   }
   if(p==='/api/search'&&m==='POST'){const b=await body(req);return json({rows:await store.search(required(b.query,'query',500),filters(new URLSearchParams(b.filters??{})))});}
   // Public search is a GET so it remains a read-only route.
@@ -49,6 +49,7 @@ export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
   if(p==='/api/blockers'&&m==='POST'){const b=await body(req),now=new Date().toISOString();const blocker={id:crypto.randomUUID(),kind:'blocker',title:required(b.title,'blocker title',500),client:required(b.client,'client'),since:date(b.since),status:'open',revision:1,history:[{at:now,status:'open',evidence:text(b.evidence??'','evidence',2000)}]};await store.put(blocker,null);return json({blocker},201);}
   const blockerMatch=p.match(/^\/api\/blockers\/([\w-]+)$/);
   if(blockerMatch&&m==='PUT'){const old=await store.get(blockerMatch[1]);if(!old||old.kind!=='blocker')throw new AppError(404,'Blocker not found');const b=await body(req);if(b.revision!==old.revision)throw new AppError(409,'Blocker changed');if(!['open','resolved'].includes(b.status))throw new AppError(400,'Invalid blocker status');const blocker={...old,status:b.status,revision:old.revision+1,history:[...old.history,{at:new Date().toISOString(),status:b.status,evidence:required(b.evidence,'resolution evidence',2000)}]};await store.put(blocker,b.revision);return json({blocker});}
+  if(isDemo&&p.startsWith('/api/calls'))throw new AppError(403,'Calls are private to the owner');
   if(p==='/api/calls'&&m==='GET')return json({calls:(await granola(env,'/calls')).calls});
   const callMatch=p.match(/^\/api\/calls\/([\w-]+)$/);if(callMatch&&m==='GET')return json({call:await granola(env,'/calls/'+callMatch[1])});
   if(p==='/api/import/preview'&&m==='POST'){const b=await body(req);const s=source(b.source);if(!s)throw new AppError(400,'Choose a source');return json({source:s,draft:{title:'Call notes',progress:'',next:'',notes:s.summary||s.transcript},warning:'Editable draft. Speaker attribution may be ambiguous; proposals are not decisions or personal commitments.'});}

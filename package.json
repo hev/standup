@@ -1,12 +1,26 @@
 {
   "name": "standup",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test src/*.test.js test/*.test.js",
+    "build": "node scripts/build.mjs",
+    "start": "node --env-file-if-exists=.env scripts/server.mjs",
+    "seed": "node scripts/seed.mjs",
+    "test:integration": "node scripts/integration.mjs",
+    "uat": "scripts/uat"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "esbuild": "^0.28.2",
+    "wrangler": "^4.151.0"
+  },
+  "description": "Capture and search standups across contexts with Layer",
+  "bin": {
+    "standup": "scripts/cli.mjs"
   }
 }

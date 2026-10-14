@@ -4,7 +4,7 @@ export function text(value, name, max = 12000) {
   return value.trim();
 }
 export function required(value, name, max = 120) { const v = text(value, name, max); if (!v) throw new AppError(400, `${name} is required`); return v; }
-export function date(value) { if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || new Date(value+'T00:00:00Z').toISOString().slice(0,10)!==value) throw new AppError(400,'Invalid date'); return value; }
+export function date(value) { const parsed=typeof value==='string'?new Date(value+'T00:00:00Z'):new Date(NaN); if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0,10)!==value) throw new AppError(400,'Invalid date'); return value; }
 export function source(value) {
   if (!value) return null;
   const s = {id:required(value.id,'source ID',500),revision:required(String(value.revision ?? ''),'source revision',200),type:required(value.type,'source type'),url:text(value.url??'','source URL',2000),time:text(value.time??'','source time',100),summary:text(value.summary??'','summary'),transcript:text(value.transcript??'','transcript')};
@@ -20,7 +20,7 @@ export function note(input) {
   if (!n.progress && !n.next && !n.notes) throw new AppError(400,'Write progress, next steps or notes');
   return n;
 }
-export async function stableId(parts) { const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(parts))); return 'import-'+[...new Uint8Array(hash)].map(v=>v.toString(16).padStart(2,'0')).join(''); }
+export async function stableId(parts) { const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(parts))); return 'import-'+[...new Uint8Array(hash)].map(v=>v.toString(16).padStart(2,'0')).join('').slice(0,56); }
 export function filters(params, kind='note') {
   const f=[['kind','Eq',kind]];
   for (const k of ['client','type']) if (params.get(k)) f.push([k,'Eq',text(params.get(k),k,120)]);

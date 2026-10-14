@@ -1,0 +1,4 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {parseArchive} from '../scripts/import-archive.mjs';
+const c={client:'Fictional Harbor',projects:['Checkout']};
+test('archive source is complete and content-addressed; repeated parse is identical',()=>{const text='# Standup\n## Progress\nHBR-142\n## Next\nReview\n## Blockers\nWaiting';const a=parseArchive(text,'standup-2026-10-14.md',c);assert.deepEqual(a,parseArchive(text,'standup-2026-10-14.md',c));assert.equal(a.progress,'HBR-142');assert.equal(a.next,'Review');assert.equal(a.source.summary,text);assert.notEqual(a.importKey,parseArchive(text+' changed','standup-2026-10-14.md',c).importKey);});
+test('invalid archive records are explicit failures',()=>{assert.throws(()=>parseArchive('# Nothing','invalid.md',c),/Missing ISO date/);assert.throws(()=>parseArchive('','2026-10-14.md',c),/Empty record/);});
