@@ -1,12 +1,12 @@
 import {AppError,row,decode} from './domain.js';
-export const schema={content:{type:'string',full_text_search:true,fuzzy:true,embed:{model:'qwen/qwen3-embedding-4b',dims:2560,serving:{prefer:'native'}}},payload:{type:'string',filterable:false},revision:{type:'uint'},kind:{type:'string'},client:{type:'string'},projects:{type:'[]string'},date:{type:'string'},type:{type:'string'}};
+export const schema={content:{type:'string',full_text_search:true,fuzzy:true,embed:{model:'qwen/qwen3-embedding-4b',dims:1024,serving:{prefer:'native'}}},payload:{type:'string',filterable:false},revision:{type:'uint'},kind:{type:'string'},client:{type:'string'},projects:{type:'[]string'},date:{type:'string'},type:{type:'string'}};
 export class LayerStore {
  constructor(env,namespace){this.env=env;this.namespace=namespace;}
  async request(path,body,method=body?'POST':'GET') {
   if(!this.env.LAYER_API_KEY || !this.env.LAYER_GATEWAY_URL) throw new AppError(503,'Storage is not configured');
   const r=await fetch(`${this.env.LAYER_GATEWAY_URL.replace(/\/$/,'')}/v2/namespaces/${encodeURIComponent(this.namespace)}${path}`,{method,headers:{Authorization:`Bearer ${this.env.LAYER_API_KEY}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(30000)});
   if(r.status===404) return null;
-  if(!r.ok) { console.error('Layer request failed',r.status,path); throw new AppError(502,`Storage request failed (${r.status})`); }
+  if(!r.ok) { console.error('Layer request failed',r.status,path); throw new AppError(502,path==='/search'?'Search is temporarily unavailable. You can still browse your timeline and notes.':'Storage is temporarily unavailable. Please try again.'); }
   return r.json();
  }
  async get(id){const r=await this.request(`/documents/${encodeURIComponent(id)}`);return r?decode(r):null;}

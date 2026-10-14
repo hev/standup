@@ -26,8 +26,9 @@ export async function handle(req,env,storeFactory=(e,n)=>new LayerStore(e,n)) {
   if(!isDemo && !await equal(supplied,env.OWNER_TOKEN))throw new AppError(401,'Sign in to your private standups');
   if(env.APP_MODE==='sandbox'&&(!env.SANDBOX_EXPIRES_AT || !Number.isFinite(Date.parse(env.SANDBOX_EXPIRES_AT)) || Date.now()>=Date.parse(env.SANDBOX_EXPIRES_AT)))throw new AppError(410,'This sandbox has expired');
   if(isDemo&&write)throw new AppError(403,'The public demo is read-only');
+  if(p==='/api/search'&&env.SEARCH_DISABLED==='1')throw new AppError(503,'Search is unavailable in this preview. Timeline and notes are still available.');
   const store=storeFactory(env,isDemo?namespaces.demo:env.APP_MODE==='private'?namespaces.privateNotes:namespaces.sandbox);
-  if(p==='/api/config'&&m==='GET')return json({mode:env.APP_MODE,readOnly:isDemo,granolaConfigured:!isDemo&&!!env.GRANOLA_ADAPTER_URL,expiresAt:env.APP_MODE==='sandbox'?env.SANDBOX_EXPIRES_AT:null});
+  if(p==='/api/config'&&m==='GET')return json({mode:env.APP_MODE,readOnly:isDemo,searchAvailable:env.SEARCH_DISABLED!=='1',granolaConfigured:!isDemo&&!!env.GRANOLA_ADAPTER_URL,expiresAt:env.APP_MODE==='sandbox'?env.SANDBOX_EXPIRES_AT:null});
   if(p==='/api/entries'&&m==='GET'){
    const rows=await store.all(filters(url.searchParams));rows.sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id));const offset=Number(url.searchParams.get('cursor')??0);if(!Number.isInteger(offset)||offset<0)throw new AppError(400,'Invalid cursor');return json({rows:rows.slice(offset,offset+50),cursor:rows.length>offset+50?String(offset+50):null});
   }

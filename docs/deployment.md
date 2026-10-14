@@ -35,6 +35,7 @@ private data: deployers must assign the intended synthetic namespace.
 
 | Variable | Purpose |
 | --- | --- |
+| `SEARCH_DISABLED` | Optional `1`: explicitly disable search in an internal preview, with a visible availability notice; does not satisfy full search acceptance |
 | `APP_MODE` | Required: `demo`, `private`, or `sandbox` |
 | `LAYER_GATEWAY_URL` | Server-side Layer HTTPS gateway |
 | `LAYER_API_KEY` | Server-side secret |

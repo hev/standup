@@ -17,7 +17,7 @@ an owner token and a separate namespace. No private data migration is included.
 ## Run a private instance
 
 Requires Node.js 22+, and a Layer gateway backed by Turbopuffer supporting native
-embeddings (`qwen/qwen3-embedding-4b`, 2560 dimensions), conditional upserts,
+embeddings (`qwen/qwen3-embedding-4b`, 1024 dimensions), conditional upserts,
 exact fetch and `/search`. This is the tested backend. Direct Turbopuffer mode
 and other stores/models are not claimed to be equivalent.
 
@@ -122,3 +122,11 @@ when exceeded. Search returns up to 30 hybrid matches, with native embeddings
 and no reranker dependency. Semantic similarity is a useful lead, not proof.
 Granola requires a separately configured adapter; there is no background sync.
 No billing, team administration, streaks or performance scoring.
+
+The tested native profile uses 1024 dimensions. Non-default 2560-dimensional
+profiles have a known metadata readback/search mismatch on the current gateway;
+see [the compatibility tracker](https://github.com/hev/standup/issues/2). The
+original fictional index is preserved for diagnosis. This app uses real native
+search and does not supply alternate vectors or periodically rewrite schemas.
+An internal preview can set `SEARCH_DISABLED=1` to clearly disable unavailable
+search while retaining the readable timeline; this is not full release acceptance.
