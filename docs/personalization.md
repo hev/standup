@@ -24,7 +24,7 @@ Standup follows the published [hev mind brand](https://hevmind.com/brand): paper
 ## Today and historical meetings
 
 The owner view leads with **Your actions today**, followed by other next actions,
-dependencies, completed progress and decisions. Today is the reader's local
+dependencies, reported progress and decisions. Today is the reader's local
 calendar date, displayed beside the meeting date. A historical meeting's “today”
 means its own date; plans never roll forward automatically. Missing reviewed
 claims, uncertain attribution and no explicit action today are honest states.
@@ -36,7 +36,7 @@ The editor and trusted workflow must verify that the existing exact source quote
 support the date: resolve meeting-day “today” using the original meeting date,
 never the import/review date. If timing is not supported, omit the date. Keep
 actually stated priorities in claim text with their supporting evidence; never
-rank by invented urgency. Progress remains completed work, dependencies retain
+rank by invented urgency. Progress retains its reported completion state, dependencies retain
 whose work is awaited, and proposals/uncertain speakers never become commitments.
 The API checks calendar validity and exact quotes; the reviewer owns semantic
 attribution and date interpretation. Saving a view does not edit/import its source.
