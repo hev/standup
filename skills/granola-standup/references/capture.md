@@ -68,6 +68,26 @@ someone else's work to the owner. No explicit today action means “no explicit 
 action recorded,” not a fabricated plan. A missing owner profile or insufficient
 attribution means a review-needed view, even if the meeting itself qualifies.
 
+### Optional action dates
+
+Consult the installed app’s `docs/personalization.md` for capability support.
+Version 1 accepts optional `actionDate: "YYYY-MM-DD"` only for `kind: "action"`.
+Use a calendar-valid date only when the exact source quotes support it; resolve
+meeting-day “today” using the original meeting date and timezone, never the
+import/review date. Omit unsupported timing rather than guessing.
+
+Only `certainty: "explicit"` plus a date equal to the reader’s local calendar day
+qualifies for today’s group. Historical, undated and ambiguous actions remain
+separate, even if a historical source says “today.” Keep actually stated priorities
+in the evidence-backed claim text; do not manufacture urgency or owner attribution.
+The API validates calendar dates and quotes; the reviewer must validate meaning.
+
+Existing undated or edited overlays remain unchanged. This additive optional field
+requires no migration, source edits or reimport. Save dates only in a newly reviewed
+view or explicitly requested refresh, preserving user edits. If the installed app
+does not support the field, omit it and report dated rendering as pending the
+compatible app; do not assume a pending app candidate is already deployed.
+
 ## Import and save separately
 
 Run the reviewed import dry-run, inspect counts/failures, then `--apply` for the

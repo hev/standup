@@ -44,6 +44,9 @@ explicit `transcriptTurns`/`excerptReason` may select a labeled reviewed portion
 including all cited turns (see CLI contract). Do not omit contradictory evidence.
 Source imports keep progress/next empty; reviewed owner claims belong in the
 separate editable personal view, not rewritten originals.
+Optional version 1 action dates follow [the capture contract](references/capture.md#optional-action-dates):
+only source-supported `actionDate` plus explicit certainty matching the reader’s
+local day qualifies as today; preserve existing undated/edited views.
 
 Report imported, already-present, ambiguous, excluded and failed counts separately,
 with date range, exact code version and safe destination status. Shared tracking
