@@ -14,3 +14,20 @@ test('profile and editable overlay persist independently without note/source ove
 test('new surfaces enforce private auth, demo read-only and same-origin cookie writes',async()=>{for(const [path,method] of [['/profile','GET'],['/profile','PUT'],['/entries/meeting-1/personalization','GET'],['/entries/meeting-1/personalization','PUT']]){const r=await handle(new Request('https://app.test/api'+path,{method,headers:{Origin:'https://app.test'}}),env,()=>{throw Error('must not reach store');});assert.equal(r.status,401);if(method==='PUT'){const r=await handle(request(path,{},method),{...env,APP_MODE:'demo'},()=>{throw Error('must not reach store');});assert.equal(r.status,403);}}const r=await handle(new Request('https://app.test/api/profile',{method:'PUT',headers:{Cookie:'standup_session='+env.OWNER_TOKEN,Origin:'https://evil.test'},body:'{}'}),env);assert.equal(r.status,403);});
 test('overlay identity stays below provider limit for existing imported IDs',async()=>{const {overlayId}=await import('../src/personalization.js');const id=await overlayId('import-'+'a'.repeat(56));assert.ok(new TextEncoder().encode(id).length<64);assert.equal(id,await overlayId('import-'+'a'.repeat(56)));assert.notEqual(id,await overlayId('import-'+'b'.repeat(56)));});
 test('optional focus storage failure cannot hide original search results',async()=>{const store={search:async()=>[structuredClone(entry)],get:async()=>{throw Error('Fictional profile outage');},all:async()=>{throw Error('Fictional overlay outage');}};const r=await handle(request('/search?q=checkout'),env,()=>store);assert.equal(r.status,200);const {rows}=await r.json();assert.equal(rows[0].id,entry.id);assert.deepEqual(rows[0].source,entry.source);assert.equal(rows[0].focusUnavailable,true);assert.equal(rows[0].personalization,null);});
+
+test('optional action dates preserve legacy overlays, reject impossible dates and never change originals',()=>{
+ const original=JSON.stringify(entry);assert.equal(overlayInput(value,entry,profile).claims[1].actionDate,undefined);
+ const dated=structuredClone(value);dated.claims[1].actionDate='2026-10-14';assert.equal(overlayInput(dated,entry,profile).claims[1].actionDate,'2026-10-14');
+ for(const date of ['2026-02-30','2026-13-01','today','2026-1-01',42]){dated.claims[1].actionDate=date;assert.throws(()=>overlayInput(dated,entry,profile));}
+ dated.claims[1].actionDate='2026-10-14';dated.claims[0].actionDate='2026-10-14';assert.throws(()=>overlayInput(dated,entry,profile));assert.equal(JSON.stringify(entry),original);
+});
+test('today separates explicit dated actions from historical plans, completed progress, proposals and ambiguity',async()=>{
+ const {focusGroups,claimLabel,localDay}=await import('../public/focus.js');
+ const claims=[...value.claims,{...value.claims[1],actionDate:'2026-10-14'},{...value.claims[1],actionDate:'2026-10-17',text:'Review today; stated first priority'},{...value.claims[4],actionDate:'2026-10-17'}];
+ const groups=focusGroups(claims,'2026-10-17');assert.equal(groups[0].claims.length,1);assert.equal(groups[0].claims[0].text,'Review today; stated first priority');
+ assert.equal(groups[1].claims.length,4);assert.equal(groups[3].claims[0].kind,'progress');assert.equal(groups[4].claims.length,0);
+ assert.equal(focusGroups(value.claims,'2026-10-14')[0].claims.length,0,'Fresh meeting alone does not date an action');
+ assert.equal(focusGroups(claims,'2026-10-18')[0].claims.length,0,'Yesterday is never rolled forward');
+ assert.match(claimLabel(claims[5],'2026-10-17'),/2026-10-14/);assert.match(claimLabel(value.claims[1]),/timing unconfirmed/);
+ assert.equal(localDay(new Date(2026,9,17,0,1)),'2026-10-17');
+});

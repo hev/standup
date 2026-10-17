@@ -20,3 +20,28 @@ Refresh sequence: read profile and existing entries; inspect original evidence l
 ## Visual treatment
 
 Standup follows the published [hev mind brand](https://hevmind.com/brand): paper and warm paper surfaces, ink and muted reading text, a single burnt orange signal, 1px rules and corners at most 2px. JetBrains Mono carries headings, navigation and controls; Inter carries prose. The operator mascot is a separate raster signature with pixel rendering, never generated typography or a substitute logo.
+
+## Today and historical meetings
+
+The owner view leads with **Your actions today**, followed by other next actions,
+dependencies, completed progress and decisions. Today is the reader's local
+calendar date, displayed beside the meeting date. A historical meeting's “today”
+means its own date; plans never roll forward automatically. Missing reviewed
+claims, uncertain attribution and no explicit action today are honest states.
+
+Version 1 claims now accept optional `actionDate: "YYYY-MM-DD"` on `kind: "action"`.
+This additive field preserves existing clients and undated overlays. Only explicit
+attribution plus a date equal to the reader's current day appears in today's group.
+The editor and trusted workflow must verify that the existing exact source quotes
+support the date: resolve meeting-day “today” using the original meeting date,
+never the import/review date. If timing is not supported, omit the date. Keep
+actually stated priorities in claim text with their supporting evidence; never
+rank by invented urgency. Progress remains completed work, dependencies retain
+whose work is awaited, and proposals/uncertain speakers never become commitments.
+The API checks calendar validity and exact quotes; the reviewer owns semantic
+attribution and date interpretation. Saving a view does not edit/import its source.
+
+The lower-left selectable `hev_layer` wordmark links to `https://hevlayer.com`,
+the canonical product domain used by the Layer repository's CE documentation.
+Its orange full block is decorative and static with reduced motion. The approved
+mascot PNG is unchanged and always backed by light paper, including dark mode.
