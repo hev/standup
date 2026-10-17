@@ -5,3 +5,14 @@
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 p,li,blockquote,summary{text-wrap:pretty}h1,h2,h3,h4{text-wrap:balance}label,.tagline{font-family:'JetBrains Mono',monospace}code{white-space:nowrap;padding:.1em .2em}pre code{white-space:inherit}.mind-wordmark span{display:inline-block;width:.6em;background:var(--signal);color:transparent;margin:0 .2em;line-height:1em}.section-title{display:flex;align-items:baseline;gap:8px}.section-prefix{color:var(--signal)}
 .heading-intro{display:flex;align-items:center;gap:22px;min-width:0}.heading-intro>div{min-width:0}.mascot{display:block;width:56px;height:auto;image-rendering:pixelated;flex-shrink:0;object-fit:contain}.empty-mascot{margin:0 auto 20px;width:42px}@media(max-width:760px){.heading-intro{gap:16px}.heading-intro h1{font-size:26px}.mascot{width:47px}.empty-mascot{width:42px}}
+/* Keep the approved transparent mascot on light paper in every theme. */
+.mascot{background:#FAFAF5;border:1px solid #E8E5DC;border-radius:2px;padding:7px;box-sizing:content-box}
+.built-label{display:block;font:11px/1.8 'JetBrains Mono',monospace;color:var(--muted);margin-bottom:5px}
+.sidebar-bottom .layer-wordmark{display:inline-flex;align-items:center;font:18px/1.4 'JetBrains Mono',monospace;color:var(--ink);text-decoration:none}
+.layer-cursor{display:inline-block;width:.6em;height:1.1em;background:var(--signal);margin-left:.2em;animation:cursor-blink 1.2s step-end infinite}
+@keyframes cursor-blink{0%,100%{opacity:1}50%{opacity:0}}
+.meeting-context,.today-empty{font-size:13px;line-height:1.8;color:var(--muted)}
+.action-date{display:block;font:11px/1.8 'JetBrains Mono',monospace;color:var(--muted)}
+@media(prefers-color-scheme:dark){:root{--paper:#191918;--warm:#23231F;--ink:#FAFAF5;--muted:#B8B8AD;--rule:#46463E;color-scheme:dark}}
+@media(prefers-reduced-motion:reduce){.layer-cursor{animation:none}}
+@media(max-width:760px){.sidebar-bottom{display:block;padding:16px 0 0}.sidebar-bottom .layer-wordmark{font-size:16px}}

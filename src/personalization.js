@@ -15,7 +15,12 @@ export function overlayInput(value,entry,profile){
  const claims=value.claims.map(c=>{
   if(!c||!kinds.includes(c.kind)||!['explicit','ambiguous'].includes(c.certainty)||!Array.isArray(c.evidence)||!c.evidence.length||c.evidence.length>8)throw new AppError(400,'Each claim needs a kind, certainty and source evidence');
   const evidence=c.evidence.map(e=>{if(!e||!evidenceFields.includes(e.field))throw new AppError(400,'Invalid evidence field');required(e.quote,'evidence quote',4000);const quote=e.quote;if(!fieldValue(entry,e.field).includes(quote))throw new AppError(400,'Evidence quote must match the original source exactly');return {field:e.field,quote};});
-  return {kind:c.kind,text:required(c.text,'claim',2000),certainty:c.certainty,evidence};
+  let actionDate;
+  if(c.actionDate!==undefined&&c.actionDate!==''){
+   actionDate=c.actionDate;
+   if(c.kind!=='action'||typeof actionDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(actionDate)||!Number.isFinite(Date.parse(actionDate))||new Date(actionDate).toISOString().slice(0,10)!==actionDate)throw new AppError(400,'Action date must be a real YYYY-MM-DD date on an action');
+  }
+  return {...(actionDate?{actionDate}:{}),kind:c.kind,text:required(c.text,'claim',2000),certainty:c.certainty,evidence};
  });
  return {version:1,profileRevision:profile.revision,entryRevision:entry.revision,sourceRevision:entry.source?.revision??'',claims,ambiguity:value.ambiguity.map(v=>text(v,'ambiguity',2000)).filter(Boolean)};
 }
